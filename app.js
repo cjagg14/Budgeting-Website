@@ -12,10 +12,22 @@ const DEFAULT_CATEGORY_GROUPS = {
 
 function freshAppData() {
     return {
+        userProfile: null,
         budgetProfile: null,
         expensesProfile: null,
         transactionLog: [],
         recurringPayments: [],
+        pdfPrefs: {
+            fields: {
+                name: true, jobTitle: true, company: true, address: true, payPeriod: true,
+                grossIncome: true, netIncome: true, expenses: true, leftover: true,
+                chart: true, notes: true
+            },
+            reminderEnabled: false,
+            reminderDay: null,
+            lastGeneratedMonthKey: null,
+            lastDismissedMonthKey: null
+        },
         categoryGroups: { ...DEFAULT_CATEGORY_GROUPS }
     };
 }
@@ -66,6 +78,7 @@ function showScreen(screenId) {
     }
 
     // restore drafts when navigating back
+    if (screenId === 'profileSetupScreen') restoreProfileSetupInputs();
     if (screenId === 'budgetInputsScreen') {
         restoreDraftToBudgetInputs();
         const label = document.getElementById('budgetBackLabel');
@@ -75,6 +88,7 @@ function showScreen(screenId) {
         }
     }
     if (screenId === 'expensesInputsScreen') restoreDraftToExpensesInputs();
+    if (screenId === 'settingsScreen') restorePdfPrefsToSettingsUI();
 
     document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
     document.getElementById(screenId).classList.add('active');
@@ -208,7 +222,9 @@ function toggleMenu() {
 function checkAuthStatus() {
     if (!currentUser) { showScreen('loginScreen'); return; }
 
-    if (!appData.budgetProfile) {
+    if (!appData.userProfile) {
+        showScreen('profileSetupScreen');
+    } else if (!appData.budgetProfile) {
         showScreen('budgetInputsScreen');
     } else if (!appData.expensesProfile) {
         showScreen('expensesInputsScreen');
@@ -216,6 +232,7 @@ function checkAuthStatus() {
     } else {
         showScreen('dashboardScreen');
         updateDashboard();
+        maybeShowPdfReminder();
     }
 }
 
@@ -235,6 +252,53 @@ async function handleGoogleLogin() {
 }
 
 // ===== Budget Inputs Screen =====
+// ===== Profile Setup Screen (Step 0) =====
+async function saveProfileSetup() {
+    const name       = document.getElementById('profileName').value.trim();
+    const jobTitle   = document.getElementById('profileJobTitle').value.trim();
+    const company    = document.getElementById('profileCompany').value.trim();
+    const address    = document.getElementById('profileAddress').value.trim();
+    const payPeriod  = document.getElementById('profilePayPeriod').value;
+    const notes      = document.getElementById('profileNotes').value.trim();
+
+    if (!name || !jobTitle) {
+        alert('Please enter both your name and job title to continue.');
+        return;
+    }
+
+    appData.userProfile = {
+        name, jobTitle, company, address, payPeriod, notes,
+        updatedAt: new Date().toISOString()
+    };
+    await saveUserProfileToFirestore();
+
+    // If this was reached via Settings (profile already existed before this
+    // edit), return to the dashboard instead of forcing the setup flow again.
+    if (appData.budgetProfile && appData.expensesProfile) {
+        showScreen('dashboardScreen');
+    } else {
+        showScreen('budgetInputsScreen');
+    }
+}
+
+function restoreProfileSetupInputs() {
+    const p = appData.userProfile;
+    document.getElementById('profileName').value       = p ? p.name       ?? '' : '';
+    document.getElementById('profileJobTitle').value    = p ? p.jobTitle   ?? '' : '';
+    document.getElementById('profileCompany').value     = p ? p.company    ?? '' : '';
+    document.getElementById('profileAddress').value     = p ? p.address    ?? '' : '';
+    document.getElementById('profilePayPeriod').value   = p ? p.payPeriod  ?? 'Monthly' : 'Monthly';
+    document.getElementById('profileNotes').value       = p ? p.notes      ?? '' : '';
+}
+
+async function saveUserProfileToFirestore() {
+    if (!currentUser) return;
+    try {
+        await db.collection('users').doc(currentUser.uid).collection('budget').doc('userProfile')
+            .set(appData.userProfile, { merge: true });
+    } catch (e) { console.error('saveUserProfile:', e); }
+}
+
 async function saveBudgetInputs() {
     saveDraftFromBudgetInputs();
     const gross   = parseFloat(document.getElementById('grossIncome').value) || 0;
@@ -931,19 +995,38 @@ async function loadAllDataFromFirestore() {
     if (!currentUser) return;
     try {
         const userDoc = db.collection('users').doc(currentUser.uid);
-        const [budgetSnap, expensesSnap, txSnap, recurringSnap] = await Promise.all([
+        const [userProfileSnap, budgetSnap, expensesSnap, txSnap, recurringSnap, pdfPrefsSnap] = await Promise.all([
+            userDoc.collection('budget').doc('userProfile').get(),
             userDoc.collection('budget').doc('profile').get(),
             userDoc.collection('budget').doc('expenses').get(),
             userDoc.collection('budget').doc('transactions').get(),
-            userDoc.collection('budget').doc('recurring').get()
+            userDoc.collection('budget').doc('recurring').get(),
+            userDoc.collection('budget').doc('pdfPrefs').get()
         ]);
-        if (budgetSnap.exists)   appData.budgetProfile   = budgetSnap.data();
-        if (expensesSnap.exists) appData.expensesProfile = expensesSnap.data();
-        if (txSnap.exists)       appData.transactionLog  = txSnap.data().log || [];
-        if (recurringSnap.exists) appData.recurringPayments = recurringSnap.data().items || [];
+        if (userProfileSnap.exists) appData.userProfile     = userProfileSnap.data();
+        if (budgetSnap.exists)      appData.budgetProfile   = budgetSnap.data();
+        if (expensesSnap.exists)    appData.expensesProfile = expensesSnap.data();
+        if (txSnap.exists)          appData.transactionLog  = txSnap.data().log || [];
+        if (recurringSnap.exists)   appData.recurringPayments = recurringSnap.data().items || [];
+        if (pdfPrefsSnap.exists) {
+            const savedPrefs = pdfPrefsSnap.data();
+            appData.pdfPrefs = {
+                ...appData.pdfPrefs,
+                ...savedPrefs,
+                fields: { ...appData.pdfPrefs.fields, ...(savedPrefs.fields || {}) }
+            };
+        }
 
         await applyRecurringPaymentsForCurrentMonth();
     } catch (e) { console.error('loadData:', e); }
+}
+
+async function savePdfPrefsToFirestore() {
+    if (!currentUser) return;
+    try {
+        await db.collection('users').doc(currentUser.uid).collection('budget').doc('pdfPrefs')
+            .set(appData.pdfPrefs, { merge: true });
+    } catch (e) { console.error('savePdfPrefs:', e); }
 }
 
 // ===== Recurring Payments =====
@@ -1009,4 +1092,376 @@ async function applyRecurringPaymentsForCurrentMonth() {
 function formatMoney(value, digits = 2) {
     const safe = Number.isFinite(value) ? value : 0;
     return `$${safe.toFixed(digits)}`;
+}
+
+// ===== PDF Settings Sync =====
+function restorePdfPrefsToSettingsUI() {
+    const p = appData.pdfPrefs || {};
+    const f = p.fields || {};
+    document.getElementById('pdfFieldName').checked        = f.name        !== false;
+    document.getElementById('pdfFieldJobTitle').checked     = f.jobTitle    !== false;
+    document.getElementById('pdfFieldCompany').checked      = f.company     !== false;
+    document.getElementById('pdfFieldAddress').checked      = f.address     !== false;
+    document.getElementById('pdfFieldPayPeriod').checked    = f.payPeriod   !== false;
+    document.getElementById('pdfFieldGrossIncome').checked  = f.grossIncome !== false;
+    document.getElementById('pdfFieldNetIncome').checked    = f.netIncome   !== false;
+    document.getElementById('pdfFieldExpenses').checked     = f.expenses    !== false;
+    document.getElementById('pdfFieldLeftover').checked     = f.leftover    !== false;
+    document.getElementById('pdfFieldChart').checked        = f.chart       !== false;
+    document.getElementById('pdfFieldNotes').checked        = f.notes       !== false;
+    document.getElementById('pdfReminderEnabled').checked   = !!p.reminderEnabled;
+    document.getElementById('pdfReminderDay').value         = p.reminderDay ?? '';
+}
+
+async function savePdfLayoutPrefs() {
+    appData.pdfPrefs.fields = {
+        name:        document.getElementById('pdfFieldName').checked,
+        jobTitle:    document.getElementById('pdfFieldJobTitle').checked,
+        company:     document.getElementById('pdfFieldCompany').checked,
+        address:     document.getElementById('pdfFieldAddress').checked,
+        payPeriod:   document.getElementById('pdfFieldPayPeriod').checked,
+        grossIncome: document.getElementById('pdfFieldGrossIncome').checked,
+        netIncome:   document.getElementById('pdfFieldNetIncome').checked,
+        expenses:    document.getElementById('pdfFieldExpenses').checked,
+        leftover:    document.getElementById('pdfFieldLeftover').checked,
+        chart:       document.getElementById('pdfFieldChart').checked,
+        notes:       document.getElementById('pdfFieldNotes').checked
+    };
+    await savePdfPrefsToFirestore();
+}
+
+async function savePdfReminderPrefs() {
+    const enabled = document.getElementById('pdfReminderEnabled').checked;
+    let day = parseInt(document.getElementById('pdfReminderDay').value, 10);
+    if (!Number.isFinite(day) || day < 1) day = 1;
+    if (day > 28) day = 28; // stay valid in every month, including February
+    document.getElementById('pdfReminderDay').value = day;
+
+    appData.pdfPrefs.reminderEnabled = enabled;
+    appData.pdfPrefs.reminderDay = day;
+    await savePdfPrefsToFirestore();
+}
+
+// ===== Monthly PDF Reminder =====
+function maybeShowPdfReminder() {
+    const p = appData.pdfPrefs;
+    if (!p || !p.reminderEnabled || !p.reminderDay) return;
+
+    const now = new Date();
+    const monthKey = currentMonthKey();
+    if (now.getDate() < p.reminderDay) return;
+    if (p.lastGeneratedMonthKey === monthKey) return;   // already generated this month
+    if (p.lastDismissedMonthKey === monthKey) return;    // already said "later" this month
+
+    document.getElementById('pdfReminderDayLabel').textContent = p.reminderDay;
+    document.getElementById('pdfReminderModal').classList.add('active');
+}
+
+async function dismissPdfReminder() {
+    appData.pdfPrefs.lastDismissedMonthKey = currentMonthKey();
+    await savePdfPrefsToFirestore();
+    document.getElementById('pdfReminderModal').classList.remove('active');
+}
+
+async function confirmPdfReminder() {
+    document.getElementById('pdfReminderModal').classList.remove('active');
+    await downloadMonthlyPdf();
+    appData.pdfPrefs.lastGeneratedMonthKey = currentMonthKey();
+    await savePdfPrefsToFirestore();
+}
+
+// ===== PDF Generation =====
+// Converts a "#rrggbb" hex color string into [r,g,b] floats 0-1, for pdf-lib's rgb().
+function hexToRgbTriplet(hex) {
+    const clean = (hex || '#888888').replace('#', '');
+    const r = parseInt(clean.substring(0, 2), 16) / 255;
+    const g = parseInt(clean.substring(2, 4), 16) / 255;
+    const b = parseInt(clean.substring(4, 6), 16) / 255;
+    return [Number.isFinite(r) ? r : 0.5, Number.isFinite(g) ? g : 0.5, Number.isFinite(b) ? b : 0.5];
+}
+
+// Simple greedy word-wrap so long notes don't run off the page edge.
+function wrapText(str, font, size, maxWidth) {
+    const words = str.split(/\s+/);
+    const lines = [];
+    let current = '';
+    words.forEach(word => {
+        const trial = current ? `${current} ${word}` : word;
+        if (font.widthOfTextAtSize(trial, size) > maxWidth && current) {
+            lines.push(current);
+            current = word;
+        } else {
+            current = trial;
+        }
+    });
+    if (current) lines.push(current);
+    return lines;
+}
+
+// Renders the spending breakdown as a pie chart on an offscreen canvas and
+// returns a PNG data URL — this gets embedded into the PDF as an image,
+// since pdf-lib can't draw filled arcs/pies natively.
+function renderPieChartPng(categories) {
+    const size = 360;
+    const canvas = document.createElement('canvas');
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext('2d');
+
+    const cx = size / 2, cy = size / 2, r = size / 2 - 8;
+    const total = categories.reduce((s, c) => s + c.actual, 0);
+
+    if (total <= 0) {
+        ctx.fillStyle = '#e8e8ea';
+        ctx.beginPath();
+        ctx.arc(cx, cy, r, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#9a9aa0';
+        ctx.font = '16px Helvetica, Arial, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('No spending yet', cx, cy);
+        return canvas.toDataURL('image/png');
+    }
+
+    let startAngle = -Math.PI / 2;
+    categories.filter(c => c.actual > 0).forEach(c => {
+        const slice = (c.actual / total) * Math.PI * 2;
+        ctx.beginPath();
+        ctx.moveTo(cx, cy);
+        ctx.arc(cx, cy, r, startAngle, startAngle + slice);
+        ctx.closePath();
+        ctx.fillStyle = c.color;
+        ctx.fill();
+        startAngle += slice;
+    });
+
+    // donut hole for a cleaner look matching the in-app ring style
+    ctx.beginPath();
+    ctx.arc(cx, cy, r * 0.55, 0, Math.PI * 2);
+    ctx.fillStyle = '#ffffff';
+    ctx.fill();
+
+    return canvas.toDataURL('image/png');
+}
+
+async function downloadMonthlyPdf() {
+    if (!appData.userProfile || !appData.budgetProfile || !appData.expensesProfile) {
+        alert('Please finish setting up your profile, income, and expenses first.');
+        return;
+    }
+    if (typeof PDFLib === 'undefined') {
+        alert('PDF library failed to load. Check your connection and try again.');
+        return;
+    }
+
+    const { PDFDocument, StandardFonts, rgb } = PDFLib;
+    const pdfDoc = await PDFDocument.create();
+    const font     = await pdfDoc.embedFont(StandardFonts.Helvetica);
+    const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+
+    const pageSize = [595, 842]; // A4
+    let page = pdfDoc.addPage(pageSize);
+    const { width, height } = page.getSize();
+    const margin = 48;
+    const contentWidth = width - margin * 2;
+    let y = height - margin;
+
+    // ----- Palette -----
+    const accent   = rgb(0, 0.68, 0.71);   // app teal
+    const accentBg = rgb(0.92, 0.98, 0.98);
+    const dark     = rgb(0.12, 0.12, 0.14);
+    const grey     = rgb(0.45, 0.45, 0.48);
+    const lineCol  = rgb(0.82, 0.82, 0.85);
+    const good      = rgb(0.1, 0.6, 0.3);
+    const bad       = rgb(0.8, 0.2, 0.2);
+
+    const newPage = () => {
+        page = pdfDoc.addPage(pageSize);
+        y = height - margin;
+        return page;
+    };
+
+    const ensureSpace = (needed) => {
+        if (y - needed < margin) newPage();
+    };
+
+    const text = (str, x, yy, opts = {}) => {
+        page.drawText(str, { x, y: yy, size: opts.size ?? 11, font: opts.bold ? fontBold : font, color: opts.color ?? dark });
+    };
+
+    const hr = (yy, color = lineCol, thickness = 1) => {
+        page.drawLine({ start: { x: margin, y: yy }, end: { x: width - margin, y: yy }, thickness, color });
+    };
+
+    const now = new Date();
+    const monthLabel = now.toLocaleDateString('en-CA', { month: 'long', year: 'numeric' });
+    const f = appData.pdfPrefs.fields || {};
+    const profile = appData.userProfile;
+    const gross   = parseFloat(appData.budgetProfile.monthlyGross) || 0;
+    const net     = parseFloat(appData.budgetProfile.monthlyNet)   || 0;
+
+    const categories = computeCategoryPlannedActual();
+    const totalSpent = categories.reduce((s, c) => s + c.actual, 0);
+    const leftover   = net - totalSpent;
+
+    // ============================================================
+    // HEADER BAND
+    // ============================================================
+    // HEADER BAND
+    const bandHeight = 92;
+    page.drawRectangle({ x: 0, y: height - bandHeight, width, height: bandHeight, color: rgb(0.07, 0.09, 0.1) });
+    text('Monthly Spending & Earnings Statement', margin, height - 38, { size: 17, bold: true, color: rgb(1, 1, 1) });
+    text(monthLabel, margin, height - 60, { size: 11, color: rgb(0.75, 0.92, 0.92) });
+    const genLabel = `Generated ${now.toLocaleDateString('en-CA', { month: 'short', day: 'numeric', year: 'numeric' })}`;
+    const genLabelW = font.widthOfTextAtSize(genLabel, 9);
+    text(genLabel, width - margin - genLabelW, height - 38, { size: 9, color: rgb(0.7, 0.7, 0.72) });
+    y = height - bandHeight - 26;
+
+    // ============================================================
+    // PROFILE TABLE
+    // ============================================================
+    const profileRows = [];
+    if (f.name)      profileRows.push(['Name', profile.name || '—']);
+    if (f.jobTitle)  profileRows.push(['Job Title', profile.jobTitle || '—']);
+    if (f.company)   profileRows.push(['Company', profile.company || '—']);
+    if (f.address)   profileRows.push(['Home Address', profile.address || '—']);
+    if (f.payPeriod) profileRows.push(['Pay Period', profile.payPeriod || '—']);
+
+    if (profileRows.length) {
+        text('EMPLOYEE INFORMATION', margin, y, { size: 9, bold: true, color: grey });
+        y -= 14;
+        const colW = contentWidth / 2;
+        profileRows.forEach((row, i) => {
+            const colX = (i % 2 === 0) ? margin : margin + colW;
+            if (i % 2 === 0 && i > 0) y -= 20;
+            text(row[0] + ':', colX, y, { size: 10, color: grey });
+            text(row[1], colX + 92, y, { size: 10, bold: true });
+        });
+        y -= 26;
+        hr(y);
+        y -= 22;
+    }
+
+    // ============================================================
+    // SUMMARY TABLE (statement / grid style)
+    // ============================================================
+    text('EARNINGS & SUMMARY', margin, y, { size: 9, bold: true, color: grey });
+    y -= 16;
+
+    const summaryRows = [];
+    if (f.grossIncome) summaryRows.push(['Income before deductions', formatMoney(gross), dark]);
+    if (f.netIncome)   summaryRows.push(['Income after deductions',  formatMoney(net), dark]);
+    if (f.expenses)    summaryRows.push(['Total spent this month',   formatMoney(totalSpent), dark]);
+    if (f.leftover)    summaryRows.push(['Leftover (saved)',         formatMoney(leftover), leftover >= 0 ? good : bad]);
+
+    const rowH = 26;
+    const tableTop = y;
+    summaryRows.forEach((row, i) => {
+        const rowY = tableTop - i * rowH;
+        if (i % 2 === 0) {
+            page.drawRectangle({ x: margin, y: rowY - rowH + 8, width: contentWidth, height: rowH, color: accentBg });
+        }
+        text(row[0], margin + 10, rowY, { size: 11 });
+        const valW = fontBold.widthOfTextAtSize(row[1], 12) * 1.05;
+        text(row[1], width - margin - 16 - valW, rowY, { size: 12, bold: true, color: row[2] });
+    });
+    y = tableTop - summaryRows.length * rowH - 6;
+    page.drawRectangle({ x: margin, y: tableTop - summaryRows.length * rowH + 8, width: contentWidth, height: summaryRows.length * rowH, borderColor: lineCol, borderWidth: 1 });
+    y -= 24;
+
+    // ============================================================
+    // PIE CHART + CATEGORY TABLE (side by side)
+    // ============================================================
+    const spentCategories = categories.filter(c => c.actual > 0 || c.planned > 0);
+
+    if (f.chart && spentCategories.length) {
+        ensureSpace(220);
+        text('SPENDING BREAKDOWN', margin, y, { size: 9, bold: true, color: grey });
+        y -= 14;
+
+        const chartPng = renderPieChartPng(spentCategories);
+        const pngImage = await pdfDoc.embedPng(chartPng);
+        const chartSize = 150;
+        const chartTop = y;
+        page.drawImage(pngImage, { x: margin, y: chartTop - chartSize, width: chartSize, height: chartSize });
+
+        // legend to the right of the chart
+        const legendX = margin + chartSize + 24;
+        let legendY = chartTop - 6;
+        spentCategories.slice(0, 8).forEach(c => {
+            const [r, g, b] = hexToRgbTriplet(c.color);
+            page.drawRectangle({ x: legendX, y: legendY - 8, width: 9, height: 9, color: rgb(r, g, b) });
+            text(`${c.label}`, legendX + 14, legendY, { size: 9.5 });
+            text(formatMoney(c.actual), width - margin - 10 - font.widthOfTextAtSize(formatMoney(c.actual), 9.5), legendY, { size: 9.5, color: grey });
+            legendY -= 16;
+        });
+
+        y = chartTop - chartSize - 20;
+        hr(y);
+        y -= 22;
+    }
+
+    // ============================================================
+    // CATEGORY DETAIL TABLE
+    // ============================================================
+    if (spentCategories.length) {
+        ensureSpace(60);
+        text('CATEGORY DETAIL', margin, y, { size: 9, bold: true, color: grey });
+        y -= 16;
+
+        // table header row
+        const col1 = margin, col2 = margin + 230, col3 = margin + 340, col4 = width - margin - 60;
+        text('Category', col1, y, { size: 9.5, bold: true, color: grey });
+        text('Spent', col2, y, { size: 9.5, bold: true, color: grey });
+        text('Goal', col3, y, { size: 9.5, bold: true, color: grey });
+        text('% Used', col4, y, { size: 9.5, bold: true, color: grey });
+        y -= 8;
+        hr(y);
+        y -= 14;
+
+        spentCategories.forEach((c, i) => {
+            ensureSpace(22);
+            if (i % 2 === 0) {
+                page.drawRectangle({ x: margin, y: y - 6, width: contentWidth, height: 18, color: accentBg });
+            }
+            const pct = c.planned > 0 ? Math.min((c.actual / c.planned) * 100, 999) : (c.actual > 0 ? 100 : 0);
+            text(c.label, col1 + 6, y, { size: 10 });
+            text(formatMoney(c.actual), col2, y, { size: 10 });
+            text(formatMoney(c.planned), col3, y, { size: 10 });
+            text(`${pct.toFixed(0)}%`, col4, y, { size: 10, color: pct > 100 ? bad : dark });
+            y -= 18;
+        });
+        y -= 10;
+        hr(y);
+        y -= 22;
+    }
+
+    // ============================================================
+    // NOTES
+    // ============================================================
+    if (f.notes && profile.notes) {
+        ensureSpace(60);
+        text('NOTES', margin, y, { size: 9, bold: true, color: grey });
+        y -= 14;
+        const wrapped = wrapText(profile.notes, font, 10, contentWidth - 12);
+        wrapped.forEach(line => {
+            ensureSpace(16);
+            text(line, margin, y, { size: 10, color: dark });
+            y -= 14;
+        });
+    }
+
+    // ----- Footer on last page -----
+    text('Generated by BudgetApp — for personal record-keeping', margin, margin - 10, { size: 8, color: grey });
+
+    const pdfBytes = await pdfDoc.save();
+    const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+    const url  = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `BudgetApp-Report-${currentMonthKey()}.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
 }
