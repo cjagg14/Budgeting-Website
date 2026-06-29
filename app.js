@@ -1346,7 +1346,7 @@ async function downloadMonthlyPdf() {
     // SUMMARY TABLE (statement / grid style)
     // ============================================================
     text('EARNINGS & SUMMARY', margin, y, { size: 9, bold: true, color: grey });
-    y -= 16;
+    y -= 20;
 
     const summaryRows = [];
     if (f.grossIncome) summaryRows.push(['Income before deductions', formatMoney(gross), dark]);
@@ -1359,14 +1359,14 @@ async function downloadMonthlyPdf() {
     summaryRows.forEach((row, i) => {
         const rowY = tableTop - i * rowH;
         if (i % 2 === 0) {
-            page.drawRectangle({ x: margin, y: rowY - rowH + 8, width: contentWidth, height: rowH, color: accentBg });
+            page.drawRectangle({ x: margin, y: rowY - rowH + 16, width: contentWidth, height: rowH, color: accentBg });
         }
         text(row[0], margin + 10, rowY, { size: 11 });
         const valW = fontBold.widthOfTextAtSize(row[1], 12) * 1.05;
         text(row[1], width - margin - 16 - valW, rowY, { size: 12, bold: true, color: row[2] });
     });
     y = tableTop - summaryRows.length * rowH - 6;
-    page.drawRectangle({ x: margin, y: tableTop - summaryRows.length * rowH + 8, width: contentWidth, height: summaryRows.length * rowH, borderColor: lineCol, borderWidth: 1 });
+    page.drawRectangle({ x: margin, y: tableTop - summaryRows.length * rowH + 16, width: contentWidth, height: summaryRows.length * rowH, borderColor: lineCol, borderWidth: 1 });
     y -= 24;
 
     // ============================================================
