@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BudgetApp — Track Your Finances</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<!-- Page background (dark, fills full viewport on desktop) -->
+<div class="page-bg">
+    <!-- App frame: phone-width container, centered on desktop -->
+    <div class="app-frame">
+
+        <!-- ===== LOGIN SCREEN ===== -->
+        <div id="loginScreen" class="screen active">
+            <div class="login-container">
+                <div class="logo-badge">💰</div>
+                <h1 class="logo-title">BudgetApp</h1>
+                <p class="tagline">Manage your finances across all devices</p>
+
+                <div class="auth-card">
+                    <button class="btn btn-google" onclick="handleGoogleLogin()">
+                        <svg class="google-icon" viewBox="0 0 24 24" width="20" height="20">
+                            <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                            <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                            <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                            <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                        </svg>
+                        Sign in with Google
+                    </button>
+                </div>
+
+                <p class="login-footer">Your data syncs securely across all devices</p>
+            </div>
+        </div>
+
+        <!-- ===== BUDGET INPUTS SCREEN (Step 1) ===== -->
+        <div id="budgetInputsScreen" class="screen">
+            <div class="header-nav">
+                <button class="nav-btn nav-btn-text" onclick="handleBudgetScreenBack()">
+                    <span class="nav-btn-icon">←</span> <span id="budgetBackLabel">Logout</span>
+                </button>
+                <span class="header-title">Income</span>
+                <div class="nav-spacer"></div>
+            </div>
+            <div class="step-indicator">
+                <span class="step-dot active"></span>
+                <span class="step-dot"></span>
+                <span class="step-text">Step 1 of 2</span>
+            </div>
+
+            <div class="screen-content">
+                <h2 class="page-title">Pay Stub Breakdown 📊</h2>
+                <p class="page-subtitle">Enter the exact metrics from your monthly statement.</p>
+
+                <div class="input-group">
+                    <label class="field-label">Monthly Gross Income ($)</label>
+                    <input type="number" id="grossIncome" placeholder="e.g. 5000" class="form-input">
+                </div>
+
+                <div class="input-group">
+                    <label class="field-label">Federal Income Tax ($)</label>
+                    <input type="number" id="fedTax" placeholder="e.g. 650" class="form-input">
+                </div>
+
+                <div class="input-group">
+                    <label class="field-label">Provincial Tax ($)</label>
+                    <input type="number" id="provTax" placeholder="e.g. 320" class="form-input">
+                </div>
+
+                <div class="input-group">
+                    <label class="field-label">CPP Contribution ($)</label>
+                    <input type="number" id="cpp" placeholder="e.g. 240" class="form-input">
+                </div>
+
+                <div class="input-group">
+                    <label class="field-label">EI Premium ($)</label>
+                    <input type="number" id="ei" placeholder="e.g. 75" class="form-input">
+                </div>
+
+                <!-- Custom deductions injected here by JS -->
+                <div id="customDeductionsContainer"></div>
+
+                <button class="btn btn-secondary" onclick="addCustomDeduction()">+ Add Other Deduction</button>
+                <button class="btn btn-primary" onclick="saveBudgetInputs()">Save &amp; Continue →</button>
+                <div class="bottom-spacer"></div>
+            </div>
+        </div>
+
+        <!-- ===== EXPENSES INPUTS SCREEN (Step 2) ===== -->
+        <div id="expensesInputsScreen" class="screen">
+            <div class="header-nav">
+                <button class="nav-btn nav-btn-text" onclick="showScreen('budgetInputsScreen')">
+                    <span class="nav-btn-icon">←</span> Income
+                </button>
+                <span class="header-title">Expenses</span>
+                <div class="nav-spacer"></div>
+            </div>
+            <div class="step-indicator">
+                <span class="step-dot done"></span>
+                <span class="step-dot active"></span>
+                <span class="step-text">Step 2 of 2</span>
+            </div>
+
+            <div class="screen-content">
+                <h2 class="page-title">Monthly Commitments 🏠</h2>
+                <p class="page-subtitle">
+                    Available Budget Space: <span class="highlight" id="availableBudgetSpace">$0.00</span>
+                </p>
+
+                <h3 class="section-header">Core Obligations</h3>
+
+                <div class="input-group">
+                    <label class="field-label">Rent / Mortgage ($)</label>
+                    <input type="number" id="rent" placeholder="e.g. 1800" class="form-input">
+                </div>
+                <div class="input-group">
+                    <label class="field-label">Groceries ($)</label>
+                    <input type="number" id="groceries" placeholder="e.g. 400" class="form-input">
+                </div>
+                <div class="input-group">
+                    <label class="field-label">Utilities ($)</label>
+                    <input type="number" id="utilities" placeholder="e.g. 150" class="form-input">
+                </div>
+                <div class="input-group">
+                    <label class="field-label">Phone Bill ($)</label>
+                    <input type="number" id="phoneBill" placeholder="e.g. 75" class="form-input">
+                </div>
+                <div class="input-group">
+                    <label class="field-label">Transportation &amp; Gas ($)</label>
+                    <input type="number" id="transportation" placeholder="e.g. 200" class="form-input">
+                </div>
+
+                <h3 class="section-header" style="margin-top: 24px;">Financial Growth &amp; Freedom</h3>
+
+                <div class="input-group">
+                    <label class="field-label">Savings Target ($)</label>
+                    <input type="number" id="savings" placeholder="e.g. 500" class="form-input">
+                </div>
+                <div class="input-group">
+                    <label class="field-label">Investments / Portfolios ($)</label>
+                    <input type="number" id="investments" placeholder="e.g. 300" class="form-input">
+                </div>
+                <div class="input-group">
+                    <label class="field-label">Miscellaneous / Flex Funds ($)</label>
+                    <input type="number" id="misc" placeholder="e.g. 150" class="form-input">
+                </div>
+
+                <!-- Custom expenses injected here by JS -->
+                <div id="customExpensesContainer"></div>
+
+                <button class="btn btn-secondary" onclick="addCustomExpense()">+ Add Other Expense</button>
+                <button class="btn btn-primary" onclick="saveExpenseInputs()">Complete Profile →</button>
+                <div class="bottom-spacer"></div>
+            </div>
+        </div>
+
+        <!-- ===== DASHBOARD SCREEN ===== -->
+        <div id="dashboardScreen" class="screen">
+            <div class="header-nav header-nav-brand">
+                <div class="header-brand">
+                    <span class="header-brand-badge">💰</span>
+                    <span class="header-title header-title-left">Dashboard</span>
+                </div>
+                <button class="nav-btn icon-btn" onclick="showScreen('settingsScreen')" aria-label="Settings">⚙️</button>
+            </div>
+
+            <!-- Dashboard tabs (right below header) -->
+            <div class="tab-bar" role="tablist" aria-label="Dashboard tabs">
+                <button id="tabBudgetView" class="tab-btn active" onclick="showDashboardTab('budgetView')">Budget View</button>
+                <button id="tabSpendingChart" class="tab-btn" onclick="showDashboardTab('spendingChart')">Spending Chart</button>
+            </div>
+
+            <div class="screen-content">
+
+                <!-- 4-card summary grid -->
+                <div class="summary-grid">
+                    <div class="summary-card">
+                        <div class="summary-card-header">
+                            <span class="summary-label">Net Income</span>
+                            <span class="summary-icon">📈</span>
+                        </div>
+                        <p class="summary-amount" id="netIncome">$0.00</p>
+                    </div>
+                    <div class="summary-card">
+                        <div class="summary-card-header">
+                            <span class="summary-label">Planned</span>
+                            <span class="summary-icon">📋</span>
+                        </div>
+                        <p class="summary-amount" id="plannedExpenses">$0.00</p>
+                    </div>
+                    <div class="summary-card">
+                        <div class="summary-card-header">
+                            <span class="summary-label">Total Spent</span>
+                            <span class="summary-icon">💸</span>
+                        </div>
+                        <p class="summary-amount" id="totalSpent">$0.00</p>
+                    </div>
+                    <div class="summary-card">
+                        <div class="summary-card-header">
+                            <span class="summary-label">Remaining</span>
+                            <span class="summary-icon">💳</span>
+                        </div>
+                        <p class="summary-amount" id="walletRemaining">$0.00</p>
+                    </div>
+                </div>
+
+                <!-- ===== Budget View (list) ===== -->
+                <div id="dashboardBudgetView" class="dashboard-subview active">
+                    <!-- Budget groups rendered by JS -->
+                    <div id="budgetGroupsContainer"></div>
+
+                    <!-- Log spending button -->
+                    <button class="btn btn-primary log-btn" onclick="openLogModal()">+ Log Spending</button>
+
+                    <!-- Recent transactions -->
+                    <h3 class="section-header" style="margin-top: 4px;">Recent Transactions</h3>
+            <div id="transactionLogContainer">
+                        <p class="empty-state">No transactions logged yet.</p>
+                    </div>
+                </div>
+
+                <!-- ===== Spending Chart View ===== -->
+                <div id="dashboardSpendingChartView" class="dashboard-subview">
+                    <div class="chart-card">
+                        <div class="chart-card-header">
+                            <div>
+                                <div class="chart-title">Spending Goals</div>
+                                <div class="chart-subtitle">Each slice is your goal — it fills as you spend</div>
+                            </div>
+                        </div>
+
+                        <div class="chart-ring-wrap">
+                            <div class="chart-ring" aria-label="Planned vs Actual spending chart">
+                                <div id="chartPlannedRing" class="chart-ring-planned"></div>
+                                <div id="chartActualRing" class="chart-ring-actual"></div>
+                                <div class="chart-ring-center" id="chartCenterLabel"></div>
+                            </div>
+                        </div>
+
+                        <div id="spendingChartLegend" class="chart-legend"></div>
+                    </div>
+
+                    <div class="chart-card-footer">
+                        <div class="chart-card-footer-hint">Tip: tap any category below to log what you spent.</div>
+                    </div>
+                </div>
+
+                <div class="bottom-spacer"></div>
+            </div>
+        </div>
+
+        <!-- ===== SETTINGS SCREEN ===== -->
+        <div id="settingsScreen" class="screen">
+            <div class="header-nav">
+                <button class="nav-btn nav-btn-text" onclick="showScreen('dashboardScreen')">
+                    <span class="nav-btn-icon">←</span> Done
+                </button>
+                <span class="header-title">Settings</span>
+                <div class="nav-spacer"></div>
+            </div>
+
+            <div class="screen-content">
+                <h3 class="section-header">Budget Setup</h3>
+                <button class="settings-action-btn" onclick="showScreen('budgetInputsScreen')">
+                    <span class="settings-action-icon">✏️</span>
+                    <div class="settings-action-text">
+                        <div class="settings-action-title">Edit Income &amp; Expenses</div>
+                        <div class="settings-action-meta">Update your pay stub or monthly commitments</div>
+                    </div>
+                </button>
+
+                <h3 class="section-header" style="margin-top: 24px;">Security Profile</h3>
+                <div class="settings-card">
+                    <p class="settings-card-title">Active User: <span id="currentUserEmail">user@email.com</span></p>
+                    <p class="settings-card-meta">Synced across all your devices with Firebase.</p>
+                </div>
+
+                <h3 class="section-header" style="margin-top: 24px;">Data Operations</h3>
+
+                <button class="settings-action-btn" onclick="clearTransactions()">
+                    <span class="settings-action-icon">🧼</span>
+                    <div class="settings-action-text">
+                        <div class="settings-action-title">Clear Current Month Transactions</div>
+                        <div class="settings-action-meta">Flushes logs but retains income &amp; expense structure</div>
+                    </div>
+                </button>
+
+                <button class="settings-action-btn danger" onclick="factoryReset()">
+                    <span class="settings-action-icon">🚨</span>
+                    <div class="settings-action-text">
+                        <div class="settings-action-title">Factory Reset Application</div>
+                        <div class="settings-action-meta">Permanently wipes all credentials, configurations, and data</div>
+                    </div>
+                </button>
+
+                <button class="btn btn-logout" onclick="handleLogout()">Log Out Account</button>
+                <div class="bottom-spacer"></div>
+            </div>
+        </div>
+
+    </div><!-- /app-frame -->
+</div><!-- /page-bg -->
+
+
+<!-- ===== MODALS (fixed, outside app-frame) ===== -->
+
+<div id="logSpendingModal" class="modal">
+    <div class="modal-backdrop" onclick="closeLogModal()"></div>
+    <div class="modal-sheet">
+        <div class="modal-handle"></div>
+        <h2 class="modal-title">Log Spending</h2>
+
+        <div class="input-group">
+            <label class="field-label">Category</label>
+            <select id="logCategory" class="form-input" onchange="onLogCategoryChange()">
+                <option value="">Select Category</option>
+            </select>
+        </div>
+        <div class="input-group">
+            <label class="field-label">Amount ($)</label>
+            <input type="number" id="logAmount" placeholder="0.00" class="form-input">
+        </div>
+        <div class="input-group">
+            <label class="field-label">Note (optional)</label>
+            <input type="text" id="logNote" placeholder="Merchant or description" class="form-input">
+        </div>
+
+        <button type="button" id="recurringToggleBtn" class="recurring-btn" onclick="toggleRecurringInModal()">
+            <span class="recurring-icon">🔁</span>
+            <span class="recurring-text">
+                <span class="recurring-title">Make this a recurring payment</span>
+                <span class="recurring-sub">Skip logging it manually each month</span>
+            </span>
+            <span class="recurring-check">○</span>
+        </button>
+
+        <div class="modal-actions">
+            <button class="btn btn-primary" onclick="saveTransaction()">Log Transaction</button>
+            <button class="btn btn-secondary" onclick="closeLogModal()">Cancel</button>
+        </div>
+    </div>
+</div>
+
+<!-- Firebase SDK (Compatibility) -->
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore-compat.js"></script>
+<script src="firebase-config.js"></script>
+<script src="app.js"></script>
+
+</body>
+</html>
