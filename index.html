@@ -36,6 +36,66 @@
             </div>
         </div>
 
+        <!-- ===== PROFILE SETUP SCREEN (Step 0) ===== -->
+        <div id="profileSetupScreen" class="screen">
+            <div class="header-nav">
+                <button class="nav-btn nav-btn-text" onclick="handleLogout()">
+                    <span class="nav-btn-icon">←</span> Logout
+                </button>
+                <span class="header-title">Your Profile</span>
+                <div class="nav-spacer"></div>
+            </div>
+            <div class="step-indicator">
+                <span class="step-dot active"></span>
+                <span class="step-dot"></span>
+                <span class="step-dot"></span>
+                <span class="step-text">Step 1 of 3</span>
+            </div>
+
+            <div class="screen-content">
+                <h2 class="page-title">Let's set up your profile 👋</h2>
+                <p class="page-subtitle">This is used to personalize your monthly PDF reports.</p>
+
+                <div class="input-group">
+                    <label class="field-label">Full Name</label>
+                    <input type="text" id="profileName" placeholder="e.g. Jordan Smith" class="form-input">
+                </div>
+
+                <div class="input-group">
+                    <label class="field-label">Job Title / Position</label>
+                    <input type="text" id="profileJobTitle" placeholder="e.g. Marketing Coordinator" class="form-input">
+                </div>
+
+                <div class="input-group">
+                    <label class="field-label">Company Name</label>
+                    <input type="text" id="profileCompany" placeholder="e.g. Acme Corp" class="form-input">
+                </div>
+
+                <div class="input-group">
+                    <label class="field-label">Home Address</label>
+                    <input type="text" id="profileAddress" placeholder="e.g. 123 Main St, Toronto, ON" class="form-input">
+                </div>
+
+                <div class="input-group">
+                    <label class="field-label">Pay Period</label>
+                    <select id="profilePayPeriod" class="form-input">
+                        <option value="Monthly">Monthly</option>
+                        <option value="Bi-weekly">Bi-weekly</option>
+                        <option value="Weekly">Weekly</option>
+                        <option value="Semi-monthly">Semi-monthly</option>
+                    </select>
+                </div>
+
+                <div class="input-group">
+                    <label class="field-label">Notes (optional)</label>
+                    <textarea id="profileNotes" placeholder="Anything you'd like to remember for your records" class="form-input" rows="3"></textarea>
+                </div>
+
+                <button class="btn btn-primary" onclick="saveProfileSetup()">Save &amp; Continue →</button>
+                <div class="bottom-spacer"></div>
+            </div>
+        </div>
+
         <!-- ===== BUDGET INPUTS SCREEN (Step 1) ===== -->
         <div id="budgetInputsScreen" class="screen">
             <div class="header-nav">
@@ -46,9 +106,10 @@
                 <div class="nav-spacer"></div>
             </div>
             <div class="step-indicator">
+                <span class="step-dot done"></span>
                 <span class="step-dot active"></span>
                 <span class="step-dot"></span>
-                <span class="step-text">Step 1 of 2</span>
+                <span class="step-text">Step 2 of 3</span>
             </div>
 
             <div class="screen-content">
@@ -100,8 +161,9 @@
             </div>
             <div class="step-indicator">
                 <span class="step-dot done"></span>
+                <span class="step-dot done"></span>
                 <span class="step-dot active"></span>
-                <span class="step-text">Step 2 of 2</span>
+                <span class="step-text">Step 3 of 3</span>
             </div>
 
             <div class="screen-content">
@@ -263,12 +325,96 @@
             </div>
 
             <div class="screen-content">
-                <h3 class="section-header">Budget Setup</h3>
+                <h3 class="section-header">Profile</h3>
+                <button class="settings-action-btn" onclick="showScreen('profileSetupScreen')">
+                    <span class="settings-action-icon">👤</span>
+                    <div class="settings-action-text">
+                        <div class="settings-action-title">Edit Name &amp; Job Title</div>
+                        <div class="settings-action-meta">Used to personalize your PDF reports</div>
+                    </div>
+                </button>
+
+                <h3 class="section-header" style="margin-top: 24px;">Budget Setup</h3>
                 <button class="settings-action-btn" onclick="showScreen('budgetInputsScreen')">
                     <span class="settings-action-icon">✏️</span>
                     <div class="settings-action-text">
                         <div class="settings-action-title">Edit Income &amp; Expenses</div>
                         <div class="settings-action-meta">Update your pay stub or monthly commitments</div>
+                    </div>
+                </button>
+
+                <h3 class="section-header" style="margin-top: 24px;">PDF Reports</h3>
+
+                <div class="settings-card">
+                    <p class="settings-card-title">Report includes</p>
+                    <p class="settings-card-meta" style="margin-bottom: 12px;">Choose what shows up on your monthly PDF.</p>
+
+                    <label class="checkbox-row">
+                        <input type="checkbox" id="pdfFieldName" checked onchange="savePdfLayoutPrefs()">
+                        <span>Name</span>
+                    </label>
+                    <label class="checkbox-row">
+                        <input type="checkbox" id="pdfFieldJobTitle" checked onchange="savePdfLayoutPrefs()">
+                        <span>Job Title / Position</span>
+                    </label>
+                    <label class="checkbox-row">
+                        <input type="checkbox" id="pdfFieldCompany" checked onchange="savePdfLayoutPrefs()">
+                        <span>Company Name</span>
+                    </label>
+                    <label class="checkbox-row">
+                        <input type="checkbox" id="pdfFieldAddress" checked onchange="savePdfLayoutPrefs()">
+                        <span>Home Address</span>
+                    </label>
+                    <label class="checkbox-row">
+                        <input type="checkbox" id="pdfFieldPayPeriod" checked onchange="savePdfLayoutPrefs()">
+                        <span>Pay Period</span>
+                    </label>
+                    <label class="checkbox-row">
+                        <input type="checkbox" id="pdfFieldGrossIncome" checked onchange="savePdfLayoutPrefs()">
+                        <span>Income before deductions</span>
+                    </label>
+                    <label class="checkbox-row">
+                        <input type="checkbox" id="pdfFieldNetIncome" checked onchange="savePdfLayoutPrefs()">
+                        <span>Income after deductions</span>
+                    </label>
+                    <label class="checkbox-row">
+                        <input type="checkbox" id="pdfFieldExpenses" checked onchange="savePdfLayoutPrefs()">
+                        <span>Total spent this month</span>
+                    </label>
+                    <label class="checkbox-row">
+                        <input type="checkbox" id="pdfFieldLeftover" checked onchange="savePdfLayoutPrefs()">
+                        <span>Leftover (what's left to save)</span>
+                    </label>
+                    <label class="checkbox-row">
+                        <input type="checkbox" id="pdfFieldChart" checked onchange="savePdfLayoutPrefs()">
+                        <span>Spending chart (pie chart)</span>
+                    </label>
+                    <label class="checkbox-row">
+                        <input type="checkbox" id="pdfFieldNotes" checked onchange="savePdfLayoutPrefs()">
+                        <span>Notes</span>
+                    </label>
+                </div>
+
+                <div class="settings-card">
+                    <p class="settings-card-title">Monthly auto-reminder</p>
+                    <p class="settings-card-meta" style="margin-bottom: 12px;">On this day each month, you'll get a popup asking to generate &amp; save that month's PDF (the app needs to be open that day).</p>
+
+                    <label class="checkbox-row">
+                        <input type="checkbox" id="pdfReminderEnabled" onchange="savePdfReminderPrefs()">
+                        <span>Enable monthly reminder</span>
+                    </label>
+
+                    <div class="input-group" style="margin-top: 10px;">
+                        <label class="field-label">Day of month (1–28)</label>
+                        <input type="number" id="pdfReminderDay" min="1" max="28" placeholder="e.g. 1" class="form-input" onchange="savePdfReminderPrefs()">
+                    </div>
+                </div>
+
+                <button class="settings-action-btn" onclick="downloadMonthlyPdf()">
+                    <span class="settings-action-icon">📄</span>
+                    <div class="settings-action-text">
+                        <div class="settings-action-title">Download This Month's PDF</div>
+                        <div class="settings-action-meta">Generates a report using the layout above</div>
                     </div>
                 </button>
 
@@ -344,11 +490,28 @@
     </div>
 </div>
 
+<div id="pdfReminderModal" class="modal">
+    <div class="modal-backdrop" onclick="dismissPdfReminder()"></div>
+    <div class="modal-sheet">
+        <div class="modal-handle"></div>
+        <h2 class="modal-title">📄 Monthly report time</h2>
+        <p class="page-subtitle" style="margin-bottom: 20px;">
+            It's day <strong id="pdfReminderDayLabel"></strong> of the month — want to generate &amp; save this month's spending PDF for your records?
+        </p>
+        <div class="modal-actions">
+            <button class="btn btn-primary" onclick="confirmPdfReminder()">Generate PDF</button>
+            <button class="btn btn-secondary" onclick="dismissPdfReminder()">Remind me later</button>
+        </div>
+    </div>
+</div>
+
 <!-- Firebase SDK (Compatibility) -->
 <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore-compat.js"></script>
 <script src="firebase-config.js"></script>
+<!-- pdf-lib for in-browser PDF generation (monthly report export) -->
+<script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
 <script src="app.js"></script>
 
 </body>
