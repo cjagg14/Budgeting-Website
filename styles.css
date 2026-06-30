@@ -555,7 +555,7 @@ select {
    ============================================================ */
 .chart-card {
     background:var(--card); border:1px solid var(--border); box-shadow:var(--shadow);
-    border-radius:var(--r-md); padding:18px; margin-bottom:12px;
+    border-radius:var(--r-md); padding:10px; margin-bottom:12px;
 }
 .chart-card-header { margin-bottom:14px; }
 .chart-title  { font-size:15px; font-weight:700; color:var(--text); margin-bottom:3px; }
@@ -574,7 +574,7 @@ select {
    leaving room for the live numeric label in the middle. */
 .chart-ring {
     position:relative;
-    width:250px; height:250px;
+    width:200px; height:200px;
     border-radius:50%;
     flex-shrink:0;
     filter:drop-shadow(0 6px 16px rgba(15,30,60,0.18));
@@ -617,7 +617,7 @@ select {
 
 .chart-legend { display:flex; flex-direction:column; gap:8px; }
 .chart-row { display:flex; align-items:center; gap:10px; }
-.chart-row .chart-ring-wrap { padding:6px 15px 18px; flex-shrink:0; }
+.chart-row .chart-ring-wrap { padding:6px 0px 18px; flex-shrink:0; }
 .chart-mini-legend { display:flex; flex-direction:column; gap:6px; flex:1; padding-bottom: 20px;}
 .mini-legend-item {
     display:flex; align-items:center; gap:6px;
