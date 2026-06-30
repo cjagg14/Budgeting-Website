@@ -32,6 +32,11 @@ function freshAppData() {
     };
 }
 
+const CUSTOM_COLOR_POOL = [
+    '#f59e0b', '#8b5cf6', '#ec4899', '#10b981', 
+    '#6366f1', '#f43f5e', '#06b6d4', '#84cc16'
+];
+
 let appData = freshAppData();
 let currentUser = null;
 
@@ -86,8 +91,12 @@ function showScreen(screenId) {
             const hasFullProfile = !!(appData.budgetProfile && appData.expensesProfile);
             label.textContent = hasFullProfile ? 'Dashboard' : 'Logout';
         }
+        updateIncomeLiveTracker();
     }
-    if (screenId === 'expensesInputsScreen') restoreDraftToExpensesInputs();
+    if (screenId === 'expensesInputsScreen') {
+        restoreDraftToExpensesInputs();
+        updateExpenseLiveTracker();
+    }
     if (screenId === 'settingsScreen') restorePdfPrefsToSettingsUI();
 
     document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
@@ -155,6 +164,7 @@ function restoreDraftToBudgetInputs() {
 
     // capture this as the active draft so further nav is consistent
     saveDraftFromBudgetInputs();
+    updateIncomeLiveTracker();
 }
 
 function saveDraftFromExpensesInputs() {
@@ -211,8 +221,8 @@ function restoreDraftToExpensesInputs() {
     });
 
     saveDraftFromExpensesInputs();
+    updateExpenseLiveTracker();
 }
-
 
 function toggleMenu() {
     // Placeholder — reserved for future side menu
@@ -343,11 +353,13 @@ function addCustomDeduction() {
             <button class="delete-button" onclick="removeCustomDeduction(${id})">✕</button>
         </div>
     `);
+    updateIncomeLiveTracker();
 }
 
 function removeCustomDeduction(id) {
     const el = document.getElementById(`deduction-${id}`);
     if (el) el.remove();
+    updateIncomeLiveTracker();
 }
 
 function getCustomDeductionsValues() {
@@ -361,11 +373,88 @@ function getCustomDeductionsValues() {
 
 // ===== Expenses Inputs Screen =====
 function displayAvailableBudgetSpace() {
-    if (appData.budgetProfile) {
-        const net = parseFloat(appData.budgetProfile.monthlyNet);
-        document.getElementById('availableBudgetSpace').textContent = formatMoney(net);
+    updateExpenseLiveTracker();
+}
+
+function updateExpenseLiveTracker() {
+    const tracker = document.getElementById('expenseLiveTracker');
+    if (!tracker || !appData.budgetProfile) return;
+
+    const net = parseFloat(appData.budgetProfile.monthlyNet) || 0;
+
+    const fieldIds = ['rent', 'groceries', 'utilities', 'phoneBill', 'transportation', 'savings', 'investments', 'misc'];
+    let allocated = fieldIds.reduce((sum, id) => {
+        const el = document.getElementById(id);
+        return sum + (el ? parseFloat(el.value) || 0 : 0);
+    }, 0);
+
+    allocated += getCustomExpensesValues().reduce((sum, e) => sum + (parseFloat(e.value) || 0), 0);
+
+    const remaining = net - allocated;
+    const pct = net > 0 ? Math.min((allocated / net) * 100, 100) : 0;
+
+    document.getElementById('liveAllocatedAmount').textContent = formatMoney(allocated);
+    document.getElementById('liveAllocatedFill').style.width = `${pct}%`;
+    document.getElementById('liveTrackerNet').textContent = formatMoney(net);
+
+    const statusEl = document.getElementById('liveTrackerStatus');
+    tracker.classList.remove('is-warning', 'is-over', 'is-complete');
+
+    if (remaining < -0.004) {
+        statusEl.textContent = `${formatMoney(Math.abs(remaining))} over budget`;
+        tracker.classList.add('is-over');
+    } else if (Math.abs(remaining) < 0.005) {
+        statusEl.textContent = `Fully allocated`;
+        tracker.classList.add('is-complete');
+    } else {
+        statusEl.textContent = `${formatMoney(remaining)} left to allocate`;
+        if (net > 0 && allocated / net >= 0.9) tracker.classList.add('is-warning');
     }
 }
+
+function updateIncomeLiveTracker() {
+    const tracker = document.getElementById('incomeLiveTracker');
+    if (!tracker) return;
+
+    const gross   = parseFloat(document.getElementById('grossIncome')?.value) || 0;
+    const fedTax  = parseFloat(document.getElementById('fedTax')?.value)      || 0;
+    const provTax = parseFloat(document.getElementById('provTax')?.value)     || 0;
+    const cpp     = parseFloat(document.getElementById('cpp')?.value)         || 0;
+    const ei      = parseFloat(document.getElementById('ei')?.value)          || 0;
+
+    const customTotal = getCustomDeductionsValues().reduce((s, d) => s + (parseFloat(d.value) || 0), 0);
+    const totalDeductions = fedTax + provTax + cpp + ei + customTotal;
+    const net = gross - totalDeductions;
+    const pct = gross > 0 ? Math.min((totalDeductions / gross) * 100, 100) : 0;
+
+    document.getElementById('liveNetAmount').textContent = formatMoney(net);
+    document.getElementById('liveNetFill').style.width = `${pct}%`;
+    document.getElementById('liveGrossAmount').textContent = formatMoney(gross);
+
+    const statusEl = document.getElementById('liveDeductionsStatus');
+    tracker.classList.remove('is-warning', 'is-over');
+
+    statusEl.textContent = `${formatMoney(totalDeductions)} in deductions`;
+    if (net < -0.004) {
+        tracker.classList.add('is-over');
+    } else if (gross > 0 && totalDeductions / gross >= 0.45) {
+        tracker.classList.add('is-warning');
+    }
+}
+
+// Live-update both trackers on any keystroke/change within their screens,
+// including dynamically-added custom rows (event delegation on the container).
+document.addEventListener('DOMContentLoaded', () => {
+    const expensesScreen = document.getElementById('expensesInputsScreen');
+    if (expensesScreen) {
+        expensesScreen.addEventListener('input', updateExpenseLiveTracker);
+    }
+    const budgetScreen = document.getElementById('budgetInputsScreen');
+    if (budgetScreen) {
+        budgetScreen.addEventListener('input', updateIncomeLiveTracker);
+    }
+});
+
 
 async function saveExpenseInputs() {
     saveDraftFromExpensesInputs();
@@ -414,11 +503,13 @@ function addCustomExpense() {
             <button class="delete-button" onclick="removeCustomExpense(${id})">✕</button>
         </div>
     `);
+    updateExpenseLiveTracker();
 }
 
 function removeCustomExpense(id) {
     const el = document.getElementById(`expense-${id}`);
     if (el) el.remove();
+    updateExpenseLiveTracker();
 }
 
 function getCustomExpensesValues() {
@@ -433,6 +524,12 @@ function getCustomExpensesValues() {
 // ===== Dashboard =====
 function updateDashboard() {
     if (!appData.budgetProfile || !appData.expensesProfile) return;
+
+    const greetEl = document.getElementById('dashboardUserName');
+    if (greetEl) {
+        const fullName = appData.userProfile?.name || '';
+        greetEl.textContent = fullName ? `Hi, ${fullName.split(' ')[0]}` : 'Dashboard';
+    }
 
     const netIncome       = parseFloat(appData.budgetProfile.monthlyNet);
     const plannedExpenses = parseFloat(appData.expensesProfile.totalExpenses);
@@ -463,14 +560,14 @@ function renderBudgetGroups() {
     const EXCLUDED_KEYS = new Set(['totalExpenses', 'customExpenses', 'updatedAt', 'savedAt']);
 
     const categoryMeta = {
-        rent:           { label: 'Rent / Mortgage',    icon: '🏠', color: '#00adb5' },
-        groceries:      { label: 'Groceries',          icon: '🛒', color: '#ff9500' },
-        utilities:      { label: 'Utilities',          icon: '⚡', color: '#af52de' },
-        phoneBill:      { label: 'Phone Bill',         icon: '📱', color: '#007aff' },
-        savings:        { label: 'Savings Target',     icon: '🐷', color: '#30d158' },
-        investments:    { label: 'Investments',        icon: '📈', color: '#5856d6' },
-        misc:           { label: 'Miscellaneous',      icon: '🌀', color: '#8e8e93' },
-        transportation: { label: 'Transit / Gas',      icon: '🚗', color: '#ff2d55' }
+        rent:           { label: 'Rent / Mortgage',    icon: '🏠', color: '#cccc00' },
+        groceries:      { label: 'Groceries',          icon: '🛒', color: '#ff9f0a' },
+        utilities:      { label: 'Utilities',          icon: '⚡', color: '#d946ef' },
+        phoneBill:      { label: 'Phone Bill',         icon: '📱', color: '#0a84ff' },
+        savings:        { label: 'Savings Target',     icon: '🐷', color: '#32d74b' },
+        investments:    { label: 'Investments',        icon: '📈', color: '#7c6cf5' },
+        misc:           { label: 'Miscellaneous',      icon: '🌀', color: '#9ca3af' },
+        transportation: { label: 'Transit / Gas',      icon: '🚗', color: '#ff375f' }
     };
 
     const groupTitles = {
@@ -506,7 +603,7 @@ function renderBudgetGroups() {
     // Custom expenses from customExpenses array
     const customExpenses = appData.expensesProfile.customExpenses || [];
     const customColors   = ['#ff3b30', '#4cd964', '#007aff', '#ff2d55', '#5856d6', '#ff6b35'];
-    const customIcons    = ['💳', '🎮', '🏋️', '🎬', '🛍️', '💇'];
+    const customIcons    = ['📦'];
     customExpenses.forEach((item, i) => {
         const target = parseFloat(item.value) || 0;
         if (!item.label || target <= 0) return;
@@ -529,6 +626,9 @@ function renderBudgetGroups() {
         return;
     }
 
+    // Collapse state persists across re-renders
+    if (!window._budgetGroupCollapsed) window._budgetGroupCollapsed = {};
+
     // Render in a consistent order
     const ORDER = ['fixed', 'everyday', 'goals', 'custom'];
     let html = '';
@@ -537,19 +637,27 @@ function renderBudgetGroups() {
         const group = groups[groupKey];
         if (!group || group.items.length === 0) return;
         const titles = groupTitles[groupKey] || { title: groupKey, subtitle: '' };
+        const isCollapsed = window._budgetGroupCollapsed[groupKey] === true;
+        const leftAmt = group.planned - group.spent;
+        const leftColor = leftAmt < 0 ? 'var(--danger)' : 'var(--success)';
 
         html += `
-        <div class="budget-group">
-            <div class="group-header">
-                <h3 class="group-title">${titles.title}</h3>
-                <p class="group-subtitle">${titles.subtitle}</p>
+        <div class="budget-group" id="budgetGroup_${groupKey}">
+            <div class="group-header group-header-toggle" onclick="toggleBudgetGroup('${groupKey}')" role="button" tabindex="0" onkeydown="if(event.key==='Enter'||event.key===' '){toggleBudgetGroup('${groupKey}');}" aria-expanded="${!isCollapsed}">
+                <div class="group-header-top">
+                    <div>
+                        <h3 class="group-title">${titles.title}</h3>
+                        <p class="group-subtitle">${titles.subtitle}</p>
+                    </div>
+                    <span class="group-chevron ${isCollapsed ? '' : 'open'}">▾</span>
+                </div>
                 <div class="group-stats">
                     <span>Planned: <strong>${formatMoney(group.planned)}</strong></span>
                     <span>Spent: <strong>${formatMoney(group.spent)}</strong></span>
-                    <span>Left: <strong>${formatMoney(group.planned - group.spent)}</strong></span>
+                    <span>Left: <strong style="color:${leftColor}">${leftAmt < 0 ? '−' : ''}${formatMoney(Math.abs(leftAmt))}</strong></span>
                 </div>
-            </div>`;
-
+            </div>
+            <div class="group-items ${isCollapsed ? '' : 'open'}"><div class="group-items-inner">`;
         group.items.forEach(item => {
             const pct        = item.target > 0 ? Math.min((item.actual / item.target) * 100, 100) : 0;
             const remaining  = item.target - item.actual;
@@ -575,10 +683,33 @@ function renderBudgetGroups() {
             </div>`;
         });
 
-        html += `</div>`;
+        html += `</div></div></div>`; // close .group-items-inner, .group-items, .budget-group
     });
 
     container.innerHTML = html;
+}
+
+function toggleBudgetGroup(groupKey) {
+    if (!window._budgetGroupCollapsed) window._budgetGroupCollapsed = {};
+    window._budgetGroupCollapsed[groupKey] = !window._budgetGroupCollapsed[groupKey];
+    const groupEl = document.getElementById('budgetGroup_' + groupKey);
+    if (!groupEl) return;
+    const header = groupEl.querySelector('.group-header-toggle');
+    const items  = groupEl.querySelector('.group-items');
+    const chevron = groupEl.querySelector('.group-chevron');
+    const collapsed = window._budgetGroupCollapsed[groupKey];
+    items.classList.toggle('open', !collapsed);
+    chevron.classList.toggle('open', !collapsed);
+    if (header) header.setAttribute('aria-expanded', String(!collapsed));
+}
+
+function getConsistentColor(key, metaByKey) {
+    // 1. If it's a known category, use the defined color
+    if (metaByKey[key]) return metaByKey[key].color;
+
+    // 2. If it's custom, pick from the pool based on the string length
+    const index = key.length % CUSTOM_COLOR_POOL.length;
+    return CUSTOM_COLOR_POOL[index];
 }
 
 function computeCategoryPlannedActual() {
@@ -614,24 +745,25 @@ function computeCategoryPlannedActual() {
 
     // meta (icon/colors) for known keys
     const metaByKey = {
-        rent:           { icon: '🏠', color: '#00adb5' },
-        groceries:      { icon: '🛒', color: '#ff9500' },
-        utilities:      { icon: '⚡', color: '#af52de' },
-        phoneBill:      { icon: '📱', color: '#007aff' },
-        transportation: { icon: '🚗', color: '#ff2d55' },
-        savings:        { icon: '🐷', color: '#30d158' },
-        investments:    { icon: '📈', color: '#5856d6' },
-        misc:           { icon: '🌀', color: '#8e8e93' }
+        rent:           { label: 'Rent / Mortgage',    icon: '🏠', color: '#cccc00' },
+        groceries:      { label: 'Groceries',          icon: '🛒', color: '#ff9f0a' },
+        utilities:      { label: 'Utilities',          icon: '⚡', color: '#d946ef' },
+        phoneBill:      { label: 'Phone Bill',         icon: '📱', color: '#0a84ff' },
+        savings:        { label: 'Savings Target',     icon: '🐷', color: '#32d74b' },
+        investments:    { label: 'Investments',        icon: '📈', color: '#7c6cf5' },
+        misc:           { label: 'Miscellaneous',      icon: '🌀', color: '#9ca3af' },
+        transportation: { label: 'Transit / Gas',      icon: '🚗', color: '#ff375f' }
     };
 
+    // Return the mapped and sorted array
     return keys
         .map(key => ({
             key,
-            label: key,
+            label: metaByKey[key]?.label || key, 
             planned: planned[key] || 0,
             actual: actual[key] || 0,
             icon: metaByKey[key]?.icon || '📦',
-            color: metaByKey[key]?.color || '#8e8e93'
+            color: getConsistentColor(key, metaByKey) // Correctly calling the helper
         }))
         .sort((a, b) => (b.actual + b.planned) - (a.actual + a.planned));
 }
@@ -725,20 +857,44 @@ function renderSpendingChart() {
         `);
     });
 
+    // Mini legend: just a colored box + name, no percentages
+    const miniEl = document.getElementById('chartMiniLegend');
+    if (miniEl) {
+        miniEl.innerHTML = categories.map(c =>
+            `<span class="mini-legend-item"><span class="mini-legend-swatch" style="background:${c.color}"></span>${c.label}</span>`
+        ).join('');
+    }
+
     if (categories.length === 0) {
         legendEl.innerHTML = '<p class="empty-state">Set up your budget targets to see this chart.</p>';
     }
 }
 
 function showDashboardTab(tabId) {
-    document.getElementById('dashboardBudgetView')?.classList.toggle('active', tabId === 'budgetView');
-    document.getElementById('dashboardSpendingChartView')?.classList.toggle('active', tabId === 'spendingChart');
+    const budgetView   = document.getElementById('dashboardBudgetView');
+    const spendingView = document.getElementById('dashboardSpendingChartView');
+    const tabBudget    = document.getElementById('tabBudgetView');
+    const tabSpending  = document.getElementById('tabSpendingChart');
 
-    document.getElementById('tabBudgetView')?.classList.toggle('active', tabId === 'budgetView');
-    document.getElementById('tabSpendingChart')?.classList.toggle('active', tabId === 'spendingChart');
+    // Fade out current active subview, then swap
+    const currentActive = [budgetView, spendingView].find(el => el && el.classList.contains('active'));
+    const nextEl = tabId === 'budgetView' ? budgetView : spendingView;
 
-    // rerender chart when switching to chart view
-    if (tabId === 'spendingChart') renderSpendingChart();
+    if (currentActive && currentActive !== nextEl) {
+        currentActive.classList.add('fading-out');
+        setTimeout(() => {
+            currentActive.classList.remove('active', 'fading-out');
+            nextEl.classList.add('active', 'fading-in');
+            setTimeout(() => nextEl.classList.remove('fading-in'), 220);
+            if (tabId === 'spendingChart') renderSpendingChart();
+        }, 150);
+    } else if (!currentActive) {
+        nextEl.classList.add('active');
+        if (tabId === 'spendingChart') renderSpendingChart();
+    }
+
+    tabBudget  && tabBudget.classList.toggle('active', tabId === 'budgetView');
+    tabSpending && tabSpending.classList.toggle('active', tabId === 'spendingChart');
 }
 
 
@@ -881,9 +1037,6 @@ async function saveTransaction() {
     await saveTransactionLogToFirestore();
     closeLogModal();
     updateDashboard();
-
-    // If user is on the spending chart tab, rerender immediately.
-    showDashboardTab('spendingChart');
 }
 
 function populateLogCategorySelect() {
