@@ -560,7 +560,7 @@ function renderBudgetGroups() {
     const EXCLUDED_KEYS = new Set(['totalExpenses', 'customExpenses', 'updatedAt', 'savedAt']);
 
     const categoryMeta = {
-        rent:           { label: 'Rent / Mortgage',    icon: '🏠', color: '#cccc00' },
+        rent:           { label: 'Rent / Mortgage',    icon: '🏠', color: '#00ffc8' },
         groceries:      { label: 'Groceries',          icon: '🛒', color: '#ff9f0a' },
         utilities:      { label: 'Utilities',          icon: '⚡', color: '#d946ef' },
         phoneBill:      { label: 'Phone Bill',         icon: '📱', color: '#0a84ff' },
@@ -663,7 +663,7 @@ function renderBudgetGroups() {
             const remaining  = item.target - item.actual;
             const overBudget = remaining < 0;
             const barColor   = overBudget ? 'var(--danger)' : item.color;
-            const recurringTag = isRecurring(item.key) ? '<span class="budget-recurring-badge">🔁 Recurring</span>' : '';
+            const recurringTag = isRecurring(item.key) ? '<span class="budget-recurring-badge">🔁</span>' : '';
 
             html += `
             <div class="budget-item" role="button" tabindex="0" data-budget-key="${item.key}" onclick="openLogModal('${item.key}')" onkeydown="if(event.key==='Enter'||event.key===' '){openLogModal('${item.key}');}">
@@ -745,13 +745,13 @@ function computeCategoryPlannedActual() {
 
     // meta (icon/colors) for known keys
     const metaByKey = {
-        rent:           { label: 'Rent/Mortgage',      icon: '🏠', color: '#cccc00' },
+        rent:           { label: 'Rent/Mortgage',      icon: '🏠', color: '#00ffc8' },
         groceries:      { label: 'Groceries',          icon: '🛒', color: '#ff9f0a' },
         utilities:      { label: 'Utilities',          icon: '⚡', color: '#d946ef' },
         phoneBill:      { label: 'Phone Bill',         icon: '📱', color: '#0a84ff' },
         savings:        { label: 'Savings Target',     icon: '🐷', color: '#32d74b' },
         investments:    { label: 'Investments',        icon: '📈', color: '#7c6cf5' },
-        misc:           { label: 'Misc',              icon: '🌀', color: '#9ca3af' },
+        misc:           { label: 'Misc',               icon: '🌀', color: '#9ca3af' },
         transportation: { label: 'Transit/Gas',        icon: '🚗', color: '#ff375f' }
     };
 
@@ -799,10 +799,9 @@ function renderSpendingChart() {
         ? `conic-gradient(from 270deg, ${sliceParts.join(', ')})`
         : 'conic-gradient(from 270deg, rgba(255,255,255,0.06) 0% 100%)';
 
-    // ----- Inner fill ring: same slice layout, but each slice is only
-    // "filled" (opaque) up to how much of ITS OWN goal has been spent.
-    // The unfilled remainder of each slice fades to transparent so the
-    // dimmer outer ring goal-color shows through — a literal fill gauge. -----
+    // ----- Inner fill: same slice geometry, each slice's color sweeps in
+    // from its start edge to fillRatio of its width; rest stays transparent
+    // so the thin outline sliver shows through. -----
     acc = 0;
     const fillParts = [];
     categories.forEach(c => {
@@ -812,9 +811,7 @@ function renderSpendingChart() {
         const fillRatio = Math.min(c.actual / c.planned, 1);
         const filledEnd = acc + pct * fillRatio;
         const end = acc + pct;
-        if (fillRatio > 0) {
-            fillParts.push(`${c.color} ${start}%, ${c.color} ${filledEnd * 100}%`);
-        }
+        if (fillRatio > 0) fillParts.push(`${c.color} ${start}%, ${c.color} ${filledEnd * 100}%`);
         fillParts.push(`transparent ${filledEnd * 100}%, transparent ${end * 100}%`);
         acc += pct;
     });
