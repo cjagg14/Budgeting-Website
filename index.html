@@ -116,6 +116,21 @@
                 <h2 class="page-title">Pay Stub Breakdown 📊</h2>
                 <p class="page-subtitle">Enter the exact metrics from your monthly statement.</p>
 
+                <!-- Live net income tracker -->
+                <div class="live-tracker" id="incomeLiveTracker">
+                    <div class="live-tracker-row">
+                        <span class="live-tracker-label">Net income (after deductions)</span>
+                        <span class="live-tracker-amount" id="liveNetAmount">$0.00</span>
+                    </div>
+                    <div class="live-tracker-bar">
+                        <div class="live-tracker-bar-fill" id="liveNetFill" style="width:0%"></div>
+                    </div>
+                    <div class="live-tracker-row live-tracker-row-sub">
+                        <span id="liveDeductionsStatus" class="live-tracker-status">$0.00 in deductions</span>
+                        <span class="live-tracker-of">of <strong id="liveGrossAmount">$0.00</strong> gross</span>
+                    </div>
+                </div>
+
                 <div class="input-group">
                     <label class="field-label">Monthly Gross Income ($)</label>
                     <input type="number" id="grossIncome" placeholder="e.g. 5000" class="form-input">
@@ -168,9 +183,22 @@
 
             <div class="screen-content">
                 <h2 class="page-title">Monthly Commitments 🏠</h2>
-                <p class="page-subtitle">
-                    Available Budget Space: <span class="highlight" id="availableBudgetSpace">$0.00</span>
-                </p>
+                <p class="page-subtitle">Set targets for each category below — the tracker updates as you type.</p>
+
+                <!-- Live allocation tracker -->
+                <div class="live-tracker" id="expenseLiveTracker">
+                    <div class="live-tracker-row">
+                        <span class="live-tracker-label">Allocated so far</span>
+                        <span class="live-tracker-amount" id="liveAllocatedAmount">$0.00</span>
+                    </div>
+                    <div class="live-tracker-bar">
+                        <div class="live-tracker-bar-fill" id="liveAllocatedFill" style="width:0%"></div>
+                    </div>
+                    <div class="live-tracker-row live-tracker-row-sub">
+                        <span id="liveTrackerStatus" class="live-tracker-status">$0.00 left to allocate</span>
+                        <span class="live-tracker-of">of <strong id="liveTrackerNet">$0.00</strong></span>
+                    </div>
+                </div>
 
                 <h3 class="section-header">Core Obligations</h3>
 
@@ -222,10 +250,8 @@
         <!-- ===== DASHBOARD SCREEN ===== -->
         <div id="dashboardScreen" class="screen">
             <div class="header-nav header-nav-brand">
-                <div class="header-brand">
-                    <span class="header-brand-badge">💰</span>
-                    <span class="header-title header-title-left">Dashboard</span>
-                </div>
+                <span class="header-greeting" id="dashboardUserName">Dashboard</span>
+                <span class="header-title">Dashboard</span>
                 <button class="nav-btn icon-btn" onclick="showScreen('settingsScreen')" aria-label="Settings">⚙️</button>
             </div>
 
@@ -294,12 +320,15 @@
                             </div>
                         </div>
 
-                        <div class="chart-ring-wrap">
-                            <div class="chart-ring" aria-label="Planned vs Actual spending chart">
-                                <div id="chartPlannedRing" class="chart-ring-planned"></div>
-                                <div id="chartActualRing" class="chart-ring-actual"></div>
-                                <div class="chart-ring-center" id="chartCenterLabel"></div>
+                        <div class="chart-row">
+                            <div class="chart-ring-wrap">
+                                <div class="chart-ring" aria-label="Planned vs Actual spending chart">
+                                    <div id="chartPlannedRing" class="chart-ring-planned"></div>
+                                    <div id="chartActualRing" class="chart-ring-actual"></div>
+                                    <div class="chart-ring-center" id="chartCenterLabel"></div>
+                                </div>
                             </div>
+                            <div id="chartMiniLegend" class="chart-mini-legend"></div>
                         </div>
 
                         <div id="spendingChartLegend" class="chart-legend"></div>
