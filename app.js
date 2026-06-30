@@ -745,14 +745,14 @@ function computeCategoryPlannedActual() {
 
     // meta (icon/colors) for known keys
     const metaByKey = {
-        rent:           { label: 'Rent / Mortgage',    icon: '🏠', color: '#cccc00' },
+        rent:           { label: 'Rent/Mortgage',      icon: '🏠', color: '#cccc00' },
         groceries:      { label: 'Groceries',          icon: '🛒', color: '#ff9f0a' },
         utilities:      { label: 'Utilities',          icon: '⚡', color: '#d946ef' },
         phoneBill:      { label: 'Phone Bill',         icon: '📱', color: '#0a84ff' },
         savings:        { label: 'Savings Target',     icon: '🐷', color: '#32d74b' },
         investments:    { label: 'Investments',        icon: '📈', color: '#7c6cf5' },
-        misc:           { label: 'Miscellaneous',      icon: '🌀', color: '#9ca3af' },
-        transportation: { label: 'Transit / Gas',      icon: '🚗', color: '#ff375f' }
+        misc:           { label: 'Misc',              icon: '🌀', color: '#9ca3af' },
+        transportation: { label: 'Transit/Gas',        icon: '🚗', color: '#ff375f' }
     };
 
     // Return the mapped and sorted array
