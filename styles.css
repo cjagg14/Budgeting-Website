@@ -1,6 +1,8 @@
 /* ============================================================
    BudgetApp — Light Banking Theme
    ============================================================ */
+body { background: #0d3b66; }
+
 :root {
     --bg:           #f3f5f8;
     --surface:      #ffffff;
@@ -398,7 +400,7 @@ select {
 }
 
 .summary-label {
-    font-size:12px; font-weight:640;
+    font-size:11px; font-weight:660;
     color:var(--text); text-transform:uppercase;
     letter-spacing:0.3px;
 }
@@ -501,12 +503,7 @@ select {
 }
 
 .budget-name { font-size:14px; font-weight:600; color:var(--text); }
-.budget-recurring-badge {
-    font-size:10px; font-weight:600;
-    background:rgba(50,215,75,0.15); color:var(--success);
-    border:1px solid rgba(50,215,75,0.25);
-    border-radius:4px; padding:1px 5px; margin-left:6px;
-}
+.budget-recurring-badge { font-size:13px; margin-left:4px; }
 
 .budget-values { text-align:right; }
 .budget-actual { font-size:12px; color:var(--text-muted); margin-bottom:1px; }
@@ -579,16 +576,21 @@ select {
     flex-shrink:0;
     filter:drop-shadow(0 6px 16px rgba(15,30,60,0.18));
 }
-.chart-ring-planned,
 .chart-ring-actual {
     position:absolute; inset:0;
     border-radius:50%;
     -webkit-mask:radial-gradient(circle, transparent 48%, #000 49%);
             mask:radial-gradient(circle, transparent 48%, #000 49%);
     transition:background 0.4s ease;
+    opacity:1; filter:drop-shadow(0 0 3px rgba(0,0,0,0.25));
 }
-.chart-ring-planned { opacity:1; filter:grayscale(0.85) brightness(1.35); }
-.chart-ring-actual  { opacity:1; filter:drop-shadow(0 0 3px rgba(0,0,0,0.25)); }
+.chart-ring-planned {
+    position:absolute; inset:0;
+    border-radius:50%;
+    -webkit-mask:radial-gradient(circle, transparent 46%, #000 47%, #000 49%, transparent 50%);
+            mask:radial-gradient(circle, transparent 46%, #000 47%, #000 49%, transparent 50%);
+    transition:background 0.4s ease;
+}
 
 .chart-ring-center {
     position:absolute; inset:0;
@@ -821,11 +823,18 @@ select {
    ============================================================ */
 @media (max-width: 767px) {
     .header-nav {
-        padding-top:env(safe-area-inset-top, 14px);
-        min-height:calc(56px + env(safe-area-inset-top, 0px));
+        /* Set top padding to the safe area height, ensuring content is pushed below the notch */
+        padding-top: env(safe-area-inset-top, 0px);
+        
+        /* Increase total height by the safe area height so the header doesn't shrink */
+        min-height: calc(56px + env(safe-area-inset-top, 0px));
+        
+        /* Ensure the background covers the entire top area */
+        background: linear-gradient(135deg, var(--primary) 0%, #16548f 100%);
     }
+    
     .modal-sheet {
-        padding-bottom:calc(34px + env(safe-area-inset-bottom, 0px));
+        padding-bottom: calc(34px + env(safe-area-inset-bottom, 0px));
     }
 }
 /* ============================================================
