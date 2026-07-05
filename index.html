@@ -1,0 +1,758 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" id="themeColorMeta" content="#f3f7f4">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+    <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+    <title>BudgetApp — Track Your Finances</title>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap">
+    <link rel="stylesheet" href="styles.css">
+    <script>
+        // Applied before first paint to avoid a flash of the wrong theme —
+        // the authoritative preference lives in Firestore (see uiPrefs in
+        // app.js) and gets reconciled once auth/data load completes; this is
+        // just the fast local cache so standalone/PWA launches look right
+        // immediately.
+        (function () {
+            try {
+                var pref = localStorage.getItem('budgetapp-theme') || 'system';
+                var resolved = pref === 'system'
+                    ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
+                    : pref;
+                document.documentElement.setAttribute('data-theme', resolved);
+                var meta = document.getElementById('themeColorMeta');
+                if (meta) meta.setAttribute('content', resolved === 'dark' ? '#0a0f0c' : '#f3f7f4');
+            } catch (e) {}
+        })();
+    </script>
+</head>
+<body>
+
+<div class="app-shell">
+
+    <!-- ===== LOGIN SCREEN ===== -->
+    <div id="loginScreen" class="screen active">
+        <div class="login-container">
+            <div class="logo-badge" data-icon="wallet"></div>
+            <h1 class="logo-title">BudgetApp</h1>
+            <p class="tagline">Manage your finances across all devices</p>
+
+            <div class="auth-card">
+                <button class="btn btn-google" onclick="handleGoogleLogin()">
+                    <svg class="google-icon" viewBox="0 0 24 24" width="20" height="20">
+                        <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                        <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                        <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                        <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                    </svg>
+                    Sign in with Google
+                </button>
+            </div>
+
+            <p class="login-footer">Your data syncs securely across all devices</p>
+        </div>
+    </div>
+
+    <!-- ===== PROFILE SETUP SCREEN (Step 0) ===== -->
+    <div id="profileSetupScreen" class="screen">
+        <div class="header-nav">
+            <div class="header-nav-inner">
+                <button class="nav-btn nav-btn-text" onclick="handleLogout()">
+                    <span class="nav-btn-icon" data-icon="back"></span> Logout
+                </button>
+                <span class="header-title">Your Profile</span>
+                <div class="nav-spacer"></div>
+            </div>
+        </div>
+        <div class="step-indicator">
+            <div class="step-indicator-inner">
+                <span class="step-dot active"></span>
+                <span class="step-dot"></span>
+                <span class="step-dot"></span>
+                <span class="step-text">Step 1 of 3</span>
+            </div>
+        </div>
+
+        <div class="screen-content narrow">
+            <h2 class="page-title">Let's set up your profile</h2>
+            <p class="page-subtitle">This is used to personalize your monthly PDF reports.</p>
+
+            <div class="input-group">
+                <label class="field-label">Full Name</label>
+                <input type="text" id="profileName" placeholder="e.g. Jordan Smith" class="form-input">
+            </div>
+
+            <div class="input-group">
+                <label class="field-label">Job Title / Position</label>
+                <input type="text" id="profileJobTitle" placeholder="e.g. Marketing Coordinator" class="form-input">
+            </div>
+
+            <div class="input-group">
+                <label class="field-label">Company Name</label>
+                <input type="text" id="profileCompany" placeholder="e.g. Acme Corp" class="form-input">
+            </div>
+
+            <div class="input-group">
+                <label class="field-label">Home Address</label>
+                <input type="text" id="profileAddress" placeholder="e.g. 123 Main St, Toronto, ON" class="form-input">
+            </div>
+
+            <div class="input-group">
+                <label class="field-label">Pay Period</label>
+                <select id="profilePayPeriod" class="form-input">
+                    <option value="Monthly">Monthly</option>
+                    <option value="Bi-weekly">Bi-weekly</option>
+                    <option value="Weekly">Weekly</option>
+                    <option value="Semi-monthly">Semi-monthly</option>
+                </select>
+            </div>
+
+            <div class="input-group">
+                <label class="field-label">Notes (optional)</label>
+                <textarea id="profileNotes" placeholder="Anything you'd like to remember for your records" class="form-input" rows="3"></textarea>
+            </div>
+
+            <button class="btn btn-primary" onclick="saveProfileSetup()">Save &amp; Continue</button>
+            <div class="bottom-spacer"></div>
+        </div>
+    </div>
+
+    <!-- ===== BUDGET INPUTS SCREEN (Step 1) ===== -->
+    <div id="budgetInputsScreen" class="screen">
+        <div class="header-nav">
+            <div class="header-nav-inner">
+                <button class="nav-btn nav-btn-text" onclick="handleBudgetScreenBack()">
+                    <span class="nav-btn-icon" data-icon="back"></span> <span id="budgetBackLabel">Logout</span>
+                </button>
+                <span class="header-title">Income</span>
+                <div class="nav-spacer"></div>
+            </div>
+        </div>
+        <div class="step-indicator">
+            <div class="step-indicator-inner">
+                <span class="step-dot done"></span>
+                <span class="step-dot active"></span>
+                <span class="step-dot"></span>
+                <span class="step-text">Step 2 of 3</span>
+            </div>
+        </div>
+
+        <div class="screen-content narrow">
+            <h2 class="page-title">Pay Stub Breakdown</h2>
+            <p class="page-subtitle">Enter the exact metrics from your monthly statement.</p>
+
+            <!-- Live net income tracker -->
+            <div class="live-tracker" id="incomeLiveTracker">
+                <div class="live-tracker-row">
+                    <span class="live-tracker-label">Net income (after deductions)</span>
+                    <span class="live-tracker-amount" id="liveNetAmount">$0.00</span>
+                </div>
+                <div class="live-tracker-bar">
+                    <div class="live-tracker-bar-fill" id="liveNetFill" style="width:0%"></div>
+                </div>
+                <div class="live-tracker-row live-tracker-row-sub">
+                    <span id="liveDeductionsStatus" class="live-tracker-status">$0.00 in deductions</span>
+                    <span class="live-tracker-of">of <strong id="liveGrossAmount">$0.00</strong> gross</span>
+                </div>
+            </div>
+
+            <div class="input-group">
+                <label class="field-label">Monthly Gross Income ($)</label>
+                <input type="number" id="grossIncome" placeholder="e.g. 5000" class="form-input">
+            </div>
+
+            <div class="input-group">
+                <label class="field-label">Federal Income Tax ($)</label>
+                <input type="number" id="fedTax" placeholder="e.g. 650" class="form-input">
+            </div>
+
+            <div class="input-group">
+                <label class="field-label">Provincial Tax ($)</label>
+                <input type="number" id="provTax" placeholder="e.g. 320" class="form-input">
+            </div>
+
+            <div class="input-group">
+                <label class="field-label">CPP Contribution ($)</label>
+                <input type="number" id="cpp" placeholder="e.g. 240" class="form-input">
+            </div>
+
+            <div class="input-group">
+                <label class="field-label">EI Premium ($)</label>
+                <input type="number" id="ei" placeholder="e.g. 75" class="form-input">
+            </div>
+
+            <!-- Custom deductions injected here by JS -->
+            <div id="customDeductionsContainer"></div>
+
+            <button class="btn btn-secondary" onclick="addCustomDeduction()"><span data-icon="plus" class="btn-icon"></span> Add Other Deduction</button>
+            <button class="btn btn-primary" onclick="saveBudgetInputs()">Save &amp; Continue</button>
+            <div class="bottom-spacer"></div>
+        </div>
+    </div>
+
+    <!-- ===== EXPENSES INPUTS SCREEN (Step 2) ===== -->
+    <div id="expensesInputsScreen" class="screen">
+        <div class="header-nav">
+            <div class="header-nav-inner">
+                <button class="nav-btn nav-btn-text" onclick="showScreen('budgetInputsScreen')">
+                    <span class="nav-btn-icon" data-icon="back"></span> Income
+                </button>
+                <span class="header-title">Expenses</span>
+                <div class="nav-spacer"></div>
+            </div>
+        </div>
+        <div class="step-indicator">
+            <div class="step-indicator-inner">
+                <span class="step-dot done"></span>
+                <span class="step-dot done"></span>
+                <span class="step-dot active"></span>
+                <span class="step-text">Step 3 of 3</span>
+            </div>
+        </div>
+
+        <div class="screen-content narrow">
+            <h2 class="page-title">Monthly Commitments</h2>
+            <p class="page-subtitle">Set targets for each category below — the tracker updates as you type.</p>
+
+            <!-- Live allocation tracker -->
+            <div class="live-tracker" id="expenseLiveTracker">
+                <div class="live-tracker-row">
+                    <span class="live-tracker-label">Allocated so far</span>
+                    <span class="live-tracker-amount" id="liveAllocatedAmount">$0.00</span>
+                </div>
+                <div class="live-tracker-bar">
+                    <div class="live-tracker-bar-fill" id="liveAllocatedFill" style="width:0%"></div>
+                </div>
+                <div class="live-tracker-row live-tracker-row-sub">
+                    <span id="liveTrackerStatus" class="live-tracker-status">$0.00 left to allocate</span>
+                    <span class="live-tracker-of">of <strong id="liveTrackerNet">$0.00</strong></span>
+                </div>
+            </div>
+
+            <h3 class="section-header">Core Obligations</h3>
+
+            <div class="input-group">
+                <label class="field-label">Rent / Mortgage ($)</label>
+                <input type="number" id="rent" placeholder="e.g. 1800" class="form-input">
+            </div>
+            <div class="input-group">
+                <label class="field-label">Groceries ($)</label>
+                <input type="number" id="groceries" placeholder="e.g. 400" class="form-input">
+            </div>
+            <div class="input-group">
+                <label class="field-label">Utilities ($)</label>
+                <input type="number" id="utilities" placeholder="e.g. 150" class="form-input">
+            </div>
+            <div class="input-group">
+                <label class="field-label">Phone Bill ($)</label>
+                <input type="number" id="phoneBill" placeholder="e.g. 75" class="form-input">
+            </div>
+            <div class="input-group">
+                <label class="field-label">Transportation &amp; Gas ($)</label>
+                <input type="number" id="transportation" placeholder="e.g. 200" class="form-input">
+            </div>
+
+            <h3 class="section-header" style="margin-top: 24px;">Financial Growth &amp; Freedom</h3>
+
+            <div class="input-group">
+                <label class="field-label">Savings Target ($)</label>
+                <input type="number" id="savings" placeholder="e.g. 500" class="form-input">
+            </div>
+            <div class="input-group">
+                <label class="field-label">Investments / Portfolios ($)</label>
+                <input type="number" id="investments" placeholder="e.g. 300" class="form-input">
+            </div>
+            <div class="input-group">
+                <label class="field-label">Miscellaneous / Flex Funds ($)</label>
+                <input type="number" id="misc" placeholder="e.g. 150" class="form-input">
+            </div>
+
+            <!-- Custom expenses injected here by JS -->
+            <div id="customExpensesContainer"></div>
+
+            <button class="btn btn-secondary" onclick="addCustomExpense()"><span data-icon="plus" class="btn-icon"></span> Add Other Expense</button>
+            <button class="btn btn-primary" onclick="saveExpenseInputs()">Complete Profile</button>
+            <div class="bottom-spacer"></div>
+        </div>
+    </div>
+
+    <!-- ===== DASHBOARD SCREEN ===== -->
+    <div id="dashboardScreen" class="screen">
+        <div class="header-nav header-nav-brand">
+            <div class="header-nav-inner">
+                <span class="header-greeting" id="dashboardUserName">Dashboard</span>
+                <span class="header-title">Dashboard</span>
+                <button class="nav-btn icon-btn" onclick="showScreen('settingsScreen')" aria-label="Settings">
+                    <span data-icon="settings"></span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Dashboard tabs (mobile only — desktop shows both panels side by side) -->
+        <div class="tab-bar" role="tablist" aria-label="Dashboard tabs">
+            <button id="tabBudgetView" class="tab-btn active" onclick="showDashboardTab('budgetView')">Budget View</button>
+            <button id="tabSpendingChart" class="tab-btn" onclick="showDashboardTab('spendingChart')">Spending Chart</button>
+        </div>
+
+        <div class="screen-content wide">
+
+            <!-- 4-card summary grid -->
+            <div class="summary-grid">
+                <div class="summary-card">
+                    <div class="summary-card-header">
+                        <span class="summary-label">Net Income</span>
+                        <span class="summary-icon" data-icon="trending-up"></span>
+                    </div>
+                    <p class="summary-amount" id="netIncome">$0.00</p>
+                </div>
+                <div class="summary-card">
+                    <div class="summary-card-header">
+                        <span class="summary-label">Planned Spending</span>
+                        <span class="summary-icon" data-icon="clipboard"></span>
+                    </div>
+                    <p class="summary-amount" id="plannedExpenses">$0.00</p>
+                </div>
+                <div class="summary-card">
+                    <div class="summary-card-header">
+                        <span class="summary-label">Total Logged</span>
+                        <span class="summary-icon" data-icon="receipt"></span>
+                    </div>
+                    <p class="summary-amount" id="totalSpent">$0.00</p>
+                </div>
+                <div class="summary-card">
+                    <div class="summary-card-header">
+                        <span class="summary-label">Remaining</span>
+                        <span class="summary-icon" data-icon="wallet"></span>
+                    </div>
+                    <p class="summary-amount" id="walletRemaining">$0.00</p>
+                </div>
+            </div>
+
+            <div class="dashboard-columns">
+                <!-- ===== Budget View (list) ===== -->
+                <div id="dashboardBudgetView" class="dashboard-subview active">
+                    <!-- Overspend warnings rendered by JS (empty when nothing is over) -->
+                    <div id="overspendBanner"></div>
+
+                    <!-- Budget groups rendered by JS -->
+                    <div id="budgetGroupsContainer"></div>
+
+                    <!-- Savings goals (separate from the monthly recurring Savings Target above) -->
+                    <div class="section-header-row">
+                        <h3 class="section-header" style="margin:0; border-bottom:none; padding-bottom:0;">Savings Goals</h3>
+                        <button class="section-action-btn" onclick="openNewGoalModal()"><span data-icon="plus" class="btn-icon"></span> New Goal</button>
+                    </div>
+                    <div id="savingsGoalsContainer"></div>
+
+                    <!-- Log spending button -->
+                    <button class="btn btn-primary log-btn" onclick="openLogModal()"><span data-icon="plus" class="btn-icon"></span> Log Spending</button>
+
+                    <!-- Recent transactions -->
+                    <h3 class="section-header" style="margin-top: 4px;">Recent Transactions</h3>
+                    <div id="transactionLogContainer">
+                        <p class="empty-state">No transactions logged this month yet.</p>
+                    </div>
+                </div>
+
+                <!-- ===== Spending Chart View ===== -->
+                <div id="dashboardSpendingChartView" class="dashboard-subview">
+                    <div class="chart-card">
+                        <div class="chart-card-header">
+                            <div>
+                                <div class="chart-title">Spending Goals</div>
+                                <div class="chart-subtitle">Each slice is your goal — it fills as you spend</div>
+                            </div>
+                        </div>
+
+                        <div class="chart-row">
+                            <div class="chart-ring-wrap">
+                                <div class="chart-ring" aria-label="Planned vs Actual spending chart">
+                                    <div id="chartPlannedRing" class="chart-ring-planned"></div>
+                                    <div id="chartActualRing" class="chart-ring-actual"></div>
+                                    <div class="chart-ring-center" id="chartCenterLabel"></div>
+                                </div>
+                            </div>
+                            <div id="chartMiniLegend" class="chart-mini-legend"></div>
+                        </div>
+
+                        <div id="spendingChartLegend" class="chart-legend"></div>
+                    </div>
+
+                    <div class="chart-card-footer">
+                        <div class="chart-card-footer-hint">Tip: tap any category below to log what you spent.</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Monthly trends — always visible, not gated behind a tab -->
+            <div class="chart-card trends-card">
+                <div class="chart-card-header">
+                    <div>
+                        <div class="chart-title">Monthly Trends</div>
+                        <div class="chart-subtitle">Last 6 months against your current plan</div>
+                    </div>
+                </div>
+                <div id="monthlyTrendsContainer" class="trend-chart"></div>
+            </div>
+
+            <div class="bottom-spacer"></div>
+        </div>
+    </div>
+
+    <!-- ===== SETTINGS SCREEN ===== -->
+    <div id="settingsScreen" class="screen">
+        <div class="header-nav">
+            <div class="header-nav-inner">
+                <button class="nav-btn nav-btn-text" onclick="showScreen('dashboardScreen')">
+                    <span class="nav-btn-icon" data-icon="back"></span> Done
+                </button>
+                <span class="header-title">Settings</span>
+                <div class="nav-spacer"></div>
+            </div>
+        </div>
+
+        <div class="screen-content narrow">
+            <h3 class="section-header">Appearance</h3>
+            <div class="theme-switcher">
+                <button type="button" class="theme-option" data-theme="light" onclick="setThemePreference('light')">
+                    <span data-icon="sun"></span> Light
+                </button>
+                <button type="button" class="theme-option" data-theme="dark" onclick="setThemePreference('dark')">
+                    <span data-icon="moon"></span> Dark
+                </button>
+                <button type="button" class="theme-option" data-theme="system" onclick="setThemePreference('system')">
+                    <span data-icon="monitor"></span> System
+                </button>
+            </div>
+
+            <h3 class="section-header" style="margin-top: 24px;">Profile</h3>
+            <button class="settings-action-btn" onclick="showScreen('profileSetupScreen')">
+                <span class="settings-action-icon" data-icon="user"></span>
+                <div class="settings-action-text">
+                    <div class="settings-action-title">Edit Name &amp; Job Title</div>
+                    <div class="settings-action-meta">Used to personalize your PDF reports</div>
+                </div>
+            </button>
+
+            <h3 class="section-header" style="margin-top: 24px;">Budget Setup</h3>
+            <button class="settings-action-btn" onclick="showScreen('budgetInputsScreen')">
+                <span class="settings-action-icon" data-icon="pencil"></span>
+                <div class="settings-action-text">
+                    <div class="settings-action-title">Edit Income &amp; Expenses</div>
+                    <div class="settings-action-meta">Update your pay stub or monthly commitments</div>
+                </div>
+            </button>
+
+            <h3 class="section-header" style="margin-top: 24px;">PDF Reports</h3>
+
+            <div class="settings-card">
+                <p class="settings-card-title">Report includes</p>
+                <p class="settings-card-meta" style="margin-bottom: 12px;">Choose what shows up on your monthly PDF.</p>
+
+                <label class="checkbox-row">
+                    <input type="checkbox" id="pdfFieldName" checked onchange="savePdfLayoutPrefs()">
+                    <span>Name</span>
+                </label>
+                <label class="checkbox-row">
+                    <input type="checkbox" id="pdfFieldJobTitle" checked onchange="savePdfLayoutPrefs()">
+                    <span>Job Title / Position</span>
+                </label>
+                <label class="checkbox-row">
+                    <input type="checkbox" id="pdfFieldCompany" checked onchange="savePdfLayoutPrefs()">
+                    <span>Company Name</span>
+                </label>
+                <label class="checkbox-row">
+                    <input type="checkbox" id="pdfFieldAddress" checked onchange="savePdfLayoutPrefs()">
+                    <span>Home Address</span>
+                </label>
+                <label class="checkbox-row">
+                    <input type="checkbox" id="pdfFieldPayPeriod" checked onchange="savePdfLayoutPrefs()">
+                    <span>Pay Period</span>
+                </label>
+                <label class="checkbox-row">
+                    <input type="checkbox" id="pdfFieldGrossIncome" checked onchange="savePdfLayoutPrefs()">
+                    <span>Income before deductions</span>
+                </label>
+                <label class="checkbox-row">
+                    <input type="checkbox" id="pdfFieldNetIncome" checked onchange="savePdfLayoutPrefs()">
+                    <span>Income after deductions</span>
+                </label>
+                <label class="checkbox-row">
+                    <input type="checkbox" id="pdfFieldExpenses" checked onchange="savePdfLayoutPrefs()">
+                    <span>Total spent this month</span>
+                </label>
+                <label class="checkbox-row">
+                    <input type="checkbox" id="pdfFieldLeftover" checked onchange="savePdfLayoutPrefs()">
+                    <span>Leftover (what's left to save)</span>
+                </label>
+                <label class="checkbox-row">
+                    <input type="checkbox" id="pdfFieldChart" checked onchange="savePdfLayoutPrefs()">
+                    <span>Spending chart (pie chart)</span>
+                </label>
+                <label class="checkbox-row">
+                    <input type="checkbox" id="pdfFieldNotes" checked onchange="savePdfLayoutPrefs()">
+                    <span>Notes</span>
+                </label>
+            </div>
+
+            <div class="settings-card">
+                <p class="settings-card-title">Monthly auto-reminder</p>
+                <p class="settings-card-meta" style="margin-bottom: 12px;">On this day each month, you'll get a popup asking to generate &amp; save that month's PDF (the app needs to be open that day).</p>
+
+                <label class="checkbox-row">
+                    <input type="checkbox" id="pdfReminderEnabled" onchange="savePdfReminderPrefs()">
+                    <span>Enable monthly reminder</span>
+                </label>
+
+                <div class="input-group" style="margin-top: 10px;">
+                    <label class="field-label">Day of month (1–28)</label>
+                    <input type="number" id="pdfReminderDay" min="1" max="28" placeholder="e.g. 1" class="form-input" onchange="savePdfReminderPrefs()">
+                </div>
+            </div>
+
+            <button class="settings-action-btn" onclick="downloadMonthlyPdf()">
+                <span class="settings-action-icon" data-icon="document"></span>
+                <div class="settings-action-text">
+                    <div class="settings-action-title">Download This Month's PDF</div>
+                    <div class="settings-action-meta">Generates a report using the layout above</div>
+                </div>
+            </button>
+
+            <h3 class="section-header" style="margin-top: 24px;">Security Profile</h3>
+            <div class="settings-card">
+                <p class="settings-card-title">Active User: <span id="currentUserEmail">user@email.com</span></p>
+                <p class="settings-card-meta">Synced across all your devices with Firebase.</p>
+            </div>
+
+            <h3 class="section-header" style="margin-top: 24px;">Data Operations</h3>
+
+            <button class="settings-action-btn" onclick="clearTransactions()">
+                <span class="settings-action-icon" data-icon="refresh"></span>
+                <div class="settings-action-text">
+                    <div class="settings-action-title">Clear Current Month Transactions</div>
+                    <div class="settings-action-meta">Flushes this month's logs but retains income &amp; expense structure</div>
+                </div>
+            </button>
+
+            <button class="settings-action-btn" onclick="exportTransactionsCsv()">
+                <span class="settings-action-icon" data-icon="download"></span>
+                <div class="settings-action-text">
+                    <div class="settings-action-title">Export Transactions (CSV)</div>
+                    <div class="settings-action-meta">Every logged transaction, for spreadsheets or your records</div>
+                </div>
+            </button>
+
+            <button class="settings-action-btn" onclick="downloadFullBackup()">
+                <span class="settings-action-icon" data-icon="download"></span>
+                <div class="settings-action-text">
+                    <div class="settings-action-title">Download Full Backup (JSON)</div>
+                    <div class="settings-action-meta">Everything — profile, budget, transactions, goals, prefs</div>
+                </div>
+            </button>
+
+            <button class="settings-action-btn" onclick="triggerRestoreFilePicker()">
+                <span class="settings-action-icon" data-icon="upload"></span>
+                <div class="settings-action-text">
+                    <div class="settings-action-title">Restore from Backup</div>
+                    <div class="settings-action-meta">Replaces your current data with a previously exported JSON file</div>
+                </div>
+            </button>
+            <input type="file" id="restoreFileInput" accept="application/json" style="display:none" onchange="handleRestoreFile(event)">
+
+            <button class="settings-action-btn danger" onclick="factoryReset()">
+                <span class="settings-action-icon" data-icon="warning"></span>
+                <div class="settings-action-text">
+                    <div class="settings-action-title">Factory Reset Application</div>
+                    <div class="settings-action-meta">Permanently wipes all credentials, configurations, and data</div>
+                </div>
+            </button>
+
+            <button class="btn btn-logout" onclick="handleLogout()"><span data-icon="log-out" class="btn-icon"></span> Log Out Account</button>
+            <div class="bottom-spacer"></div>
+        </div>
+    </div>
+
+</div><!-- /app-shell -->
+
+
+<!-- ===== MODALS ===== -->
+
+<div id="logSpendingModal" class="modal">
+    <div class="modal-backdrop" onclick="closeLogModal()"></div>
+    <div class="modal-sheet">
+        <div class="modal-handle"></div>
+        <h2 class="modal-title" id="logModalTitle">Log Spending</h2>
+
+        <div class="input-group">
+            <label class="field-label">Category</label>
+            <select id="logCategory" class="form-input" onchange="onLogCategoryChange()">
+                <option value="">Select Category</option>
+            </select>
+        </div>
+
+        <!-- Snapshot for the selected category: planned vs. spent this month,
+             plus everything already logged in it (edit/delete inline). Hidden
+             until a category is chosen, and while editing a single entry. -->
+        <div id="categoryDetailSection" class="category-detail" style="display:none;">
+            <div class="category-detail-stats">
+                <span class="category-detail-spent" id="categoryDetailSpent">$0.00</span>
+                <span class="category-detail-of">of <strong id="categoryDetailPlanned">$0.00</strong> this month</span>
+            </div>
+            <div class="progress-track category-detail-track">
+                <div class="progress-fill" id="categoryDetailFill" style="width:0%;"></div>
+            </div>
+            <div id="categoryDetailTxList" class="category-detail-list"></div>
+        </div>
+
+        <div class="input-group">
+            <label class="field-label">Amount ($)</label>
+            <input type="text" id="logAmount" class="form-input calc-trigger" placeholder="0.00" readonly inputmode="none" onclick="openCalcKeypad()" onfocus="openCalcKeypad()">
+        </div>
+
+        <div class="input-group">
+            <label class="field-label">Note (optional)</label>
+            <input type="text" id="logNote" placeholder="Merchant or description" class="form-input">
+        </div>
+
+        <button type="button" id="recurringToggleBtn" class="recurring-btn" onclick="toggleRecurringInModal()">
+            <span class="recurring-icon" data-icon="repeat"></span>
+            <span class="recurring-text">
+                <span class="recurring-title">Make this a recurring payment</span>
+                <span class="recurring-sub">Skip logging it manually each month</span>
+            </span>
+            <span class="recurring-check" data-icon="circle"></span>
+        </button>
+
+        <div class="modal-actions">
+            <button class="btn btn-primary" id="logModalPrimaryBtn" onclick="saveTransaction()">Log Transaction</button>
+            <button class="btn btn-secondary" onclick="closeLogModal()">Done</button>
+            <button type="button" class="btn-text-danger" id="deleteFromModalBtn" onclick="deleteFromEditModal()" style="display:none;">
+                <span data-icon="trash" class="btn-icon"></span> Delete this transaction
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Calculator keypad — docks at the bottom like a keyboard when the Amount
+     field above is tapped, instead of a device's native number keyboard
+     (which has no multiply/divide keys). Tap "Done" to dismiss it. -->
+<div id="calcKeypadPanel" class="calc-keypad-panel">
+    <div class="calc-keypad-header">
+        <span class="calc-expression" id="calcExpression">&nbsp;</span>
+        <button type="button" class="calc-done-btn" onclick="closeCalcKeypad()">Done</button>
+    </div>
+    <div class="calc-display" id="calcDisplay">0</div>
+    <div class="calc-keypad">
+        <button type="button" class="calc-key calc-key-fn" onclick="calcClear()">AC</button>
+        <button type="button" class="calc-key calc-key-fn" onclick="calcBackspace()" aria-label="Backspace">⌫</button>
+        <button type="button" class="calc-key calc-key-op" onclick="calcSetOperator('/')">÷</button>
+        <button type="button" class="calc-key calc-key-op" onclick="calcSetOperator('*')">×</button>
+
+        <button type="button" class="calc-key" onclick="calcInputDigit('7')">7</button>
+        <button type="button" class="calc-key" onclick="calcInputDigit('8')">8</button>
+        <button type="button" class="calc-key" onclick="calcInputDigit('9')">9</button>
+        <button type="button" class="calc-key calc-key-op" onclick="calcSetOperator('-')">−</button>
+
+        <button type="button" class="calc-key" onclick="calcInputDigit('4')">4</button>
+        <button type="button" class="calc-key" onclick="calcInputDigit('5')">5</button>
+        <button type="button" class="calc-key" onclick="calcInputDigit('6')">6</button>
+        <button type="button" class="calc-key calc-key-op" onclick="calcSetOperator('+')">+</button>
+
+        <button type="button" class="calc-key" onclick="calcInputDigit('1')">1</button>
+        <button type="button" class="calc-key" onclick="calcInputDigit('2')">2</button>
+        <button type="button" class="calc-key" onclick="calcInputDigit('3')">3</button>
+        <button type="button" class="calc-key calc-key-equals" onclick="calcEquals()">=</button>
+
+        <button type="button" class="calc-key calc-key-zero" onclick="calcInputDigit('0')">0</button>
+        <button type="button" class="calc-key" onclick="calcInputDecimal()">.</button>
+    </div>
+</div>
+
+<div id="pdfReminderModal" class="modal">
+    <div class="modal-backdrop" onclick="dismissPdfReminder()"></div>
+    <div class="modal-sheet">
+        <div class="modal-handle"></div>
+        <h2 class="modal-title"><span class="modal-title-icon" data-icon="document"></span> Monthly report time</h2>
+        <p class="page-subtitle" style="margin-bottom: 20px;">
+            It's day <strong id="pdfReminderDayLabel"></strong> of the month — want to generate &amp; save this month's spending PDF for your records?
+        </p>
+        <div class="modal-actions">
+            <button class="btn btn-primary" onclick="confirmPdfReminder()">Generate PDF</button>
+            <button class="btn btn-secondary" onclick="dismissPdfReminder()">Remind me later</button>
+        </div>
+    </div>
+</div>
+
+<div id="newGoalModal" class="modal">
+    <div class="modal-backdrop" onclick="closeNewGoalModal()"></div>
+    <div class="modal-sheet">
+        <div class="modal-handle"></div>
+        <h2 class="modal-title"><span class="modal-title-icon" data-icon="target"></span> New Savings Goal</h2>
+
+        <div class="input-group">
+            <label class="field-label">Goal Name</label>
+            <input type="text" id="goalName" placeholder="e.g. Trip to Japan" class="form-input">
+        </div>
+        <div class="input-group">
+            <label class="field-label">Target Amount ($)</label>
+            <input type="number" id="goalTarget" placeholder="e.g. 5000" class="form-input">
+        </div>
+        <div class="input-group">
+            <label class="field-label">Already Saved ($, optional)</label>
+            <input type="number" id="goalStarting" placeholder="e.g. 500" class="form-input">
+        </div>
+        <div class="input-group">
+            <label class="field-label">Target Date (optional)</label>
+            <input type="date" id="goalDate" class="form-input">
+        </div>
+
+        <div class="modal-actions">
+            <button class="btn btn-primary" onclick="saveNewGoal()">Create Goal</button>
+            <button class="btn btn-secondary" onclick="closeNewGoalModal()">Cancel</button>
+        </div>
+    </div>
+</div>
+
+<div id="contributeGoalModal" class="modal">
+    <div class="modal-backdrop" onclick="closeContributeModal()"></div>
+    <div class="modal-sheet">
+        <div class="modal-handle"></div>
+        <h2 class="modal-title"><span class="modal-title-icon" data-icon="target"></span> Add Funds</h2>
+        <p class="page-subtitle" id="contributeGoalName" style="margin-bottom: 20px;"></p>
+
+        <div class="input-group">
+            <label class="field-label">Amount ($)</label>
+            <input type="number" id="contributeAmount" placeholder="e.g. 100" class="form-input">
+        </div>
+
+        <div class="modal-actions">
+            <button class="btn btn-primary" onclick="saveContribution()">Add to Goal</button>
+            <button class="btn btn-secondary" onclick="closeContributeModal()">Cancel</button>
+        </div>
+    </div>
+</div>
+
+<!-- Undo toast — used by delete-with-undo actions (transactions, clearing a
+     month) instead of a blocking confirm() + instantly-permanent delete. -->
+<div id="undoToast" class="undo-toast">
+    <span id="undoToastMessage" class="undo-toast-message"></span>
+    <button type="button" class="undo-toast-btn" onclick="handleUndoToastClick()">Undo</button>
+</div>
+
+<!-- Firebase SDK (Compatibility) -->
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore-compat.js"></script>
+<script src="firebase-config.js"></script>
+<!-- pdf-lib for in-browser PDF generation (monthly report export) -->
+<script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+<script src="app.js"></script>
+
+</body>
+</html>
