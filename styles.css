@@ -1145,20 +1145,24 @@ select {
    UNDO TOAST
    Used by delete-with-undo actions instead of a blocking confirm() +
    instantly-permanent delete (see deleteTransaction/clearTransactions).
+   Docked at the TOP of the screen, not the bottom — the bottom is already
+   busy with modal action buttons and the calculator keypad, and the toast
+   was landing on top of them.
    ============================================================ */
 .undo-toast {
     display:none; align-items:center; gap:14px;
-    position:fixed; left:50%; bottom:24px; transform:translateX(-50%);
+    /* Clears the 56px sticky header (see .header-nav-inner) plus a small
+       gap, so the toast doesn't land on top of the nav bar itself. */
+    position:fixed; left:50%; top:calc(66px + env(safe-area-inset-top, 0px)); transform:translateX(-50%);
     max-width:calc(100vw - 32px); width:380px;
     background:#161f1a; color:#fff;
     border-radius:var(--r-pill); padding:12px 10px 12px 18px;
     box-shadow:0 12px 32px rgba(0,0,0,0.35);
     z-index:1200;
-    padding-bottom:calc(12px + env(safe-area-inset-bottom, 0px));
 }
 .undo-toast.active { display:flex; animation:toastIn 0.22s ease; }
 @keyframes toastIn {
-    from { opacity:0; transform:translateX(-50%) translateY(10px); }
+    from { opacity:0; transform:translateX(-50%) translateY(-10px); }
     to   { opacity:1; transform:translateX(-50%) translateY(0); }
 }
 .undo-toast-message { flex:1; font-size:13px; font-weight:500; }
