@@ -98,10 +98,13 @@ html, body {
 }
 
 /* Applied to <html> while any modal is open (see lockBodyScroll/
-   unlockBodyScroll in app.js) so the page underneath can't be scrolled. */
+   unlockBodyScroll in app.js) so the page underneath can't be scrolled.
+   Deliberately no height:100% here — forcing the root element's height to
+   exactly the viewport collapses its scrollable range to zero, which snaps
+   scrollY to 0 while locked and it never comes back after unlocking. Plain
+   overflow:hidden disables scrolling without touching scroll position. */
 html.modal-open-lock, html.modal-open-lock body {
     overflow:hidden;
-    height:100%;
 }
 
 /* ============================================================
