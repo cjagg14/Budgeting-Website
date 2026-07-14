@@ -1431,7 +1431,7 @@ function onLogCategoryChange() {
     renderCategoryDetailInModal();
 }
 
-function toggleRecurringInModal() {
+async function toggleRecurringInModal() {
     const category = document.getElementById('logCategory').value;
     if (!category) {
         alert('Please choose a category first.');
@@ -1439,6 +1439,29 @@ function toggleRecurringInModal() {
     }
     logModalRecurringState = !logModalRecurringState;
     renderRecurringToggle();
+
+    // Takes effect immediately — turning a category's recurring status off
+    // (or on) shouldn't require also logging a spend amount just to save
+    // it. (Deliberately doesn't auto-fill this month's transaction the way
+    // turning it on via applyRecurringPaymentsForCurrentMonth does — you
+    // might still be about to log today's actual amount in this same
+    // modal, and this shouldn't create a second, duplicate entry for it.)
+    await syncRecurringForCategory(category, logModalRecurringState);
+    updateDashboard();
+}
+
+// Shared by toggleRecurringInModal() (takes effect immediately) and
+// saveTransaction() (idempotent there — if the toggle already synced this
+// category, isRecurring() already matches and this is a no-op).
+async function syncRecurringForCategory(category, shouldBeRecurring) {
+    const wasRecurring = isRecurring(category);
+    if (shouldBeRecurring && !wasRecurring) {
+        appData.recurringPayments.push({ key: category, addedAt: new Date().toISOString() });
+        await saveRecurringPaymentsToFirestore();
+    } else if (!shouldBeRecurring && wasRecurring) {
+        appData.recurringPayments = appData.recurringPayments.filter(r => r.key !== category);
+        await saveRecurringPaymentsToFirestore();
+    }
 }
 
 function renderRecurringToggle() {
@@ -1492,15 +1515,9 @@ async function saveTransaction() {
         });
     }
 
-    // Sync the recurring toggle for this category
-    const wasRecurring = isRecurring(category);
-    if (logModalRecurringState && !wasRecurring) {
-        appData.recurringPayments.push({ key: category, addedAt: new Date().toISOString() });
-        await saveRecurringPaymentsToFirestore();
-    } else if (!logModalRecurringState && wasRecurring) {
-        appData.recurringPayments = appData.recurringPayments.filter(r => r.key !== category);
-        await saveRecurringPaymentsToFirestore();
-    }
+    // Sync the recurring toggle for this category (a no-op if the toggle
+    // button already synced it — see syncRecurringForCategory).
+    await syncRecurringForCategory(category, logModalRecurringState);
 
     await saveTransactionLogToFirestore();
     updateDashboard();
@@ -1769,18 +1786,6 @@ function currentMonthTransactions() {
 
 function isRecurring(key) {
     return appData.recurringPayments.some(r => r.key === key);
-}
-
-async function toggleRecurring(key) {
-    const idx = appData.recurringPayments.findIndex(r => r.key === key);
-    if (idx >= 0) {
-        appData.recurringPayments.splice(idx, 1);
-    } else {
-        appData.recurringPayments.push({ key, addedAt: new Date().toISOString() });
-        // Immediately fill this month for the category if not already logged.
-        await applyRecurringPaymentsForCurrentMonth();
-    }
-    await saveRecurringPaymentsToFirestore();
 }
 
 async function applyRecurringPaymentsForCurrentMonth() {
